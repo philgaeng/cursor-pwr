@@ -81,3 +81,25 @@ When any agent picks up work:
 - Mixing unrelated changes in one PR.
 - Skipping docs for behavior changes.
 
+## 11) Integration Protocol (Required)
+
+Use this sequence to avoid integration breakage while still working in parallel:
+
+1. Define or update acceptance criteria in `docs/MVP.md`.
+2. Align shared contracts first in `packages/shared/`.
+3. Implement backend and frontend in parallel against the same contract.
+4. Integrate early with a thin end-to-end path (happy path first).
+5. Validate with tests/checks before merge.
+
+Merge gates for every PR:
+
+- Contract compatibility is preserved.
+- Critical path runs locally.
+- Any contract change includes coordinated frontend + backend updates.
+
+Cadence rules:
+
+- Prefer small PRs merged daily (or every 1-2 days).
+- Avoid long-lived branches that drift from `main`.
+- Freeze non-critical contract changes near demo/release.
+
