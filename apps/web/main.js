@@ -14,6 +14,8 @@ const ICEBREAKER_QUESTIONS = [
   "What topic can you discuss for hours with high energy?",
 ];
 
+const API_BASE_URL = (window.API_BASE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
+
 const state = {
   auth: null,
   userId: null,
@@ -147,6 +149,7 @@ const mockWave = () => ({
 });
 
 const apiFetch = async (path, options = {}) => {
+  const requestUrl = path.startsWith("http") ? path : `${API_BASE_URL}${path}`;
   const requestHeaders = {
     "Content-Type": "application/json",
     ...(options.headers || {}),
@@ -155,7 +158,7 @@ const apiFetch = async (path, options = {}) => {
     requestHeaders["X-User-Id"] = state.userId;
   }
   try {
-    const response = await fetch(path, {
+    const response = await fetch(requestUrl, {
       headers: requestHeaders,
       ...options,
     });
