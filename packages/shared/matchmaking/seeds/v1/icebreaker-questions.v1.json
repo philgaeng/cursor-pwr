@@ -1,0 +1,58 @@
+{
+  "questionSetVersion": "icebreakers.v1",
+  "description": "Phase 1 predefined icebreaker set. User must answer at least 3.",
+  "questions": [
+    {
+      "id": "q01",
+      "prompt": "What kind of collaboration are you most open to at this event?"
+    },
+    {
+      "id": "q02",
+      "prompt": "What is one challenge you are currently trying to solve?"
+    },
+    {
+      "id": "q03",
+      "prompt": "What type of intro would be highest value for you this week?"
+    },
+    {
+      "id": "q04",
+      "prompt": "What domain or market are you most focused on right now?"
+    },
+    {
+      "id": "q05",
+      "prompt": "What skill or capability do you bring that others often need?"
+    },
+    {
+      "id": "q06",
+      "prompt": "What would make this event a win for you?"
+    },
+    {
+      "id": "q07",
+      "prompt": "What kind of teams do you work best with?"
+    },
+    {
+      "id": "q08",
+      "prompt": "What is one topic you can discuss for hours?"
+    },
+    {
+      "id": "q09",
+      "prompt": "What stage are your current projects in?"
+    },
+    {
+      "id": "q10",
+      "prompt": "What constraint is slowing your progress the most?"
+    },
+    {
+      "id": "q11",
+      "prompt": "What would a strong follow-up conversation look like for you?"
+    },
+    {
+      "id": "q12",
+      "prompt": "Which industries or use cases are you prioritizing this quarter?"
+    },
+    {
+      "id": "q13",
+      "prompt": "What can someone quickly help you with after this event?"
+    }
+  ]
+}

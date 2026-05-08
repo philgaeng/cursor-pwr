@@ -1,0 +1,15 @@
+{
+  "version": "scoring-rubric.v1",
+  "description": "Phase 1 deterministic weighted rubric for compatibility scoring.",
+  "weights": {
+    "offersSeeksAlignment": 0.55,
+    "roleCompanyContext": 0.25,
+    "icebreakerAffinity": 0.2
+  },
+  "constraints": {
+    "minimumReasons": 3,
+    "maximumReasons": 3,
+    "scoreRange": [0, 1],
+    "strictJsonOutput": true
+  }
+}

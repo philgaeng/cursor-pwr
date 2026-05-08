@@ -1,0 +1,25 @@
+{
+  "eventId": "event-demo-2026",
+  "eventName": "NexusLink Demo Night",
+  "timezone": "Asia/Manila",
+  "waveConfig": {
+    "mode": "hybrid",
+    "manualTriggerEnabled": true,
+    "scheduledIntervalMinutes": 15,
+    "maxCandidatesPerWave": 5
+  },
+  "defaults": {
+    "deleteAfter24h": true,
+    "requiredOffers": 3,
+    "requiredSeeks": 3,
+    "requiredIcebreakerAnswersMin": 3,
+    "primaryRevealChannel": "whatsapp"
+  },
+  "promptConfig": {
+    "scoringPromptVersion": "compatibility-scoring.v1",
+    "rationalePromptVersion": "match-rationale.v1",
+    "summaryPromptVersion": "candidate-summary.v1",
+    "scoringRubricVersion": "scoring-rubric.v1",
+    "questionSetVersion": "icebreakers.v1"
+  }
+}

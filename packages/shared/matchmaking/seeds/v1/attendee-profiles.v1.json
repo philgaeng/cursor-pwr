@@ -1,0 +1,81 @@
+{
+  "version": "attendee-profiles.v1",
+  "eventId": "event-demo-2026",
+  "profiles": [
+    {
+      "id": "u-alex-founder",
+      "name": "Alex Rivera",
+      "role": "Founder",
+      "company": "FlowLedger",
+      "offers": ["go-to-market", "saas-ops", "product-strategy"],
+      "seeks": ["seed-investor", "b2b-design-partner", "fintech-advisor"],
+      "consentAccepted": true,
+      "deleteAfter24h": true,
+      "icebreakerResponses": [
+        {
+          "questionId": "q02",
+          "answer": "Need warm intros to fintech-focused seed investors."
+        },
+        {
+          "questionId": "q06",
+          "answer": "A win is 2 strong meetings with pilot-ready partners."
+        },
+        {
+          "questionId": "q10",
+          "answer": "Long sales cycles with enterprise procurement."
+        }
+      ],
+      "whatsapp": "+639170001001"
+    },
+    {
+      "id": "u-sam-investor",
+      "name": "Sam Lee",
+      "role": "Investor",
+      "company": "NorthStar Capital",
+      "offers": ["seed-investment", "fundraising-advice", "network-intros"],
+      "seeks": ["fintech-founder", "enterprise-ai-founder", "operator-talent"],
+      "consentAccepted": true,
+      "deleteAfter24h": true,
+      "icebreakerResponses": [
+        {
+          "questionId": "q03",
+          "answer": "I want founder conversations with clear distribution insight."
+        },
+        {
+          "questionId": "q08",
+          "answer": "Vertical SaaS adoption patterns in regulated industries."
+        },
+        {
+          "questionId": "q12",
+          "answer": "B2B fintech and workflow automation."
+        }
+      ],
+      "whatsapp": "+639170001002"
+    },
+    {
+      "id": "u-mia-operator",
+      "name": "Mia Santos",
+      "role": "Head of Operations",
+      "company": "ScaleForge",
+      "offers": ["ops-automation", "process-design", "hiring-playbooks"],
+      "seeks": ["startup-founder", "product-lead", "partnership-manager"],
+      "consentAccepted": true,
+      "deleteAfter24h": true,
+      "icebreakerResponses": [
+        {
+          "questionId": "q01",
+          "answer": "Open to helping teams set up scalable internal workflows."
+        },
+        {
+          "questionId": "q05",
+          "answer": "I can quickly identify bottlenecks and simplify handoffs."
+        },
+        {
+          "questionId": "q11",
+          "answer": "A practical follow-up with clear next action owners."
+        }
+      ],
+      "whatsapp": "+639170001003"
+    }
+  ]
+}

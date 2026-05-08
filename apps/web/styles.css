@@ -28,7 +28,9 @@ body {
   display: grid;
   gap: 16px;
   padding: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: 1fr;
+  max-width: 720px;
+  margin: 0 auto;
 }
 
 .card {
@@ -84,4 +86,53 @@ ul {
 
 .owner-panel {
   border: 1px dashed #60a5fa;
+}
+
+.helper {
+  color: #475569;
+  margin-top: 0;
+}
+
+.question-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.question-row {
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.question-row input {
+  width: 100%;
+}
+
+.button-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.button-row button {
+  margin-top: 0;
+}
+
+.status-bar {
+  position: sticky;
+  bottom: 0;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 10px 16px;
+  border-top: 1px solid #1e293b;
+}
+
+.status-error {
+  color: #b91c1c;
+}
+
+.status-success {
+  color: #166534;
 }

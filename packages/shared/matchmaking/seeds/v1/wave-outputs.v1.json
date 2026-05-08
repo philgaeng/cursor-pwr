@@ -1,0 +1,45 @@
+{
+  "version": "wave-outputs.v1",
+  "waves": [
+    {
+      "waveId": "wave-2026-05-08-2000",
+      "eventId": "event-demo-2026",
+      "createdAt": "2026-05-08T12:00:00.000Z",
+      "promptMetadata": {
+        "scoringPromptVersion": "compatibility-scoring.v1",
+        "rationalePromptVersion": "match-rationale.v1",
+        "summaryPromptVersion": "candidate-summary.v1",
+        "scoringRubricVersion": "scoring-rubric.v1",
+        "questionSetVersion": "icebreakers.v1"
+      },
+      "candidates": [
+        {
+          "candidateUserId": "u-sam-investor",
+          "name": "Sam Lee",
+          "role": "Investor",
+          "company": "NorthStar Capital",
+          "compatibilityScore": 0.9,
+          "compatibilityReasons": [
+            "Strong founder-to-investor fit around fintech and B2B workflow.",
+            "Seeks and offers align on fundraising readiness and intros.",
+            "Icebreaker responses indicate shared focus on practical distribution."
+          ],
+          "revealStatus": "locked"
+        },
+        {
+          "candidateUserId": "u-mia-operator",
+          "name": "Mia Santos",
+          "role": "Head of Operations",
+          "company": "ScaleForge",
+          "compatibilityScore": 0.71,
+          "compatibilityReasons": [
+            "Operational scaling support complements founder execution goals.",
+            "Overlap in partnership-minded and execution-focused outcomes.",
+            "Question responses suggest strong practical collaboration style."
+          ],
+          "revealStatus": "locked"
+        }
+      ]
+    }
+  ]
+}

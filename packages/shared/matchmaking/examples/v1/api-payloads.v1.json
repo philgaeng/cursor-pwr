@@ -1,0 +1,103 @@
+{
+  "version": "api-payloads.v1",
+  "description": "Example payloads for API integration with prompt/version traceability.",
+  "scorePairInput": {
+    "targetUser": {
+      "id": "u-alex-founder",
+      "role": "Founder",
+      "company": "FlowLedger",
+      "offers": ["go-to-market", "saas-ops", "product-strategy"],
+      "seeks": ["seed-investor", "b2b-design-partner", "fintech-advisor"],
+      "icebreakerResponses": [
+        {
+          "questionId": "q02",
+          "answer": "Need warm intros to fintech-focused seed investors."
+        },
+        {
+          "questionId": "q06",
+          "answer": "A win is 2 strong meetings with pilot-ready partners."
+        },
+        {
+          "questionId": "q10",
+          "answer": "Long sales cycles with enterprise procurement."
+        }
+      ]
+    },
+    "candidateUser": {
+      "id": "u-sam-investor",
+      "role": "Investor",
+      "company": "NorthStar Capital",
+      "offers": ["seed-investment", "fundraising-advice", "network-intros"],
+      "seeks": ["fintech-founder", "enterprise-ai-founder", "operator-talent"],
+      "icebreakerResponses": [
+        {
+          "questionId": "q03",
+          "answer": "I want founder conversations with clear distribution insight."
+        },
+        {
+          "questionId": "q08",
+          "answer": "Vertical SaaS adoption patterns in regulated industries."
+        },
+        {
+          "questionId": "q12",
+          "answer": "B2B fintech and workflow automation."
+        }
+      ]
+    }
+  },
+  "scorePairOutput": {
+    "promptVersion": "compatibility-scoring.v1",
+    "scoreBreakdown": {
+      "offersSeeksAlignment": 0.94,
+      "roleCompanyContext": 0.84,
+      "icebreakerAffinity": 0.78
+    },
+    "compatibilityScore": 0.9,
+    "confidence": "high",
+    "reasons": [
+      "Founder and seed investor intents align tightly around fintech B2B outcomes.",
+      "Offer/seek tags show reciprocal value in funding, intros, and execution support.",
+      "Icebreaker answers point to pragmatic, partnership-oriented follow-through."
+    ]
+  },
+  "rationaleOutput": {
+    "promptVersion": "match-rationale.v1",
+    "compatibilityReasons": [
+      "Both users prioritize fintech and practical business outcomes.",
+      "The candidate offers funding and network access that matches the target seek tags.",
+      "Their responses emphasize actionable follow-ups rather than generic networking."
+    ]
+  },
+  "summaryOutput": {
+    "promptVersion": "candidate-summary.v1",
+    "summary": "Seed investor focused on fintech B2B who can support fundraising and high-value intros."
+  },
+  "wavePayloadExample": {
+    "waveId": "wave-2026-05-08-2000",
+    "eventId": "event-demo-2026",
+    "createdAt": "2026-05-08T12:00:00.000Z",
+    "promptMetadata": {
+      "scoringPromptVersion": "compatibility-scoring.v1",
+      "rationalePromptVersion": "match-rationale.v1",
+      "summaryPromptVersion": "candidate-summary.v1",
+      "scoringRubricVersion": "scoring-rubric.v1",
+      "questionSetVersion": "icebreakers.v1"
+    },
+    "candidates": [
+      {
+        "candidateUserId": "u-sam-investor",
+        "name": "Sam Lee",
+        "role": "Investor",
+        "company": "NorthStar Capital",
+        "compatibilityScore": 0.9,
+        "compatibilityReasons": [
+          "Both users prioritize fintech and practical business outcomes.",
+          "The candidate offers funding and network access that matches the target seek tags.",
+          "Their responses emphasize actionable follow-ups rather than generic networking."
+        ],
+        "candidateSummary": "Seed investor focused on fintech B2B who can support fundraising and high-value intros.",
+        "revealStatus": "locked"
+      }
+    ]
+  }
+}

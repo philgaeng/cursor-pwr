@@ -14,63 +14,111 @@
 
     <main class="layout">
       <section class="card">
-        <h2>1) Onboarding (QR Entry)</h2>
-        <form id="onboarding-form">
+        <h2>1) Auth Entry</h2>
+        <p class="helper">MVP default is Google; demo mode keeps the flow reliable offline.</p>
+        <form id="auth-form">
           <label>
             Sign in Provider
             <select id="provider" required>
               <option value="google">Google</option>
-              <option value="linkedin">LinkedIn</option>
+              <option value="linkedin">LinkedIn (Fallback UI)</option>
             </select>
           </label>
-
-          <label>
-            What I Offer (comma separated, 3)
-            <input id="offer-tags" placeholder="Venture Capital, Partnerships, Hiring" required />
+          <label class="checkbox-row">
+            <input id="demo-mode" type="checkbox" />
+            Enable demo mode login fallback
           </label>
+          <button type="submit">Continue</button>
+        </form>
+      </section>
 
+      <section class="card">
+        <h2>2) Profile + Tags</h2>
+        <form id="profile-form">
           <label>
-            What I'm Looking For (comma separated, 3)
-            <input id="seek-tags" placeholder="AI Engineer, Seed Investor, Pilot Clients" required />
+            Full Name
+            <input id="full-name" required placeholder="Alex Rivera" />
           </label>
+          <label>
+            Role
+            <input id="role" required placeholder="Founder" />
+          </label>
+          <label>
+            Company
+            <input id="company" required placeholder="Nexus Labs" />
+          </label>
+          <label>
+            WhatsApp
+            <input id="whatsapp" required placeholder="+65 9123 4567" />
+          </label>
+          <label>
+            What I Offer (comma separated, exactly 3)
+            <input id="offer-tags" required placeholder="Venture Capital, Partnerships, Hiring" />
+          </label>
+          <label>
+            What I am Looking For (comma separated, exactly 3)
+            <input id="seek-tags" required placeholder="AI Engineer, Seed Investor, Pilot Clients" />
+          </label>
+          <button type="submit">Save Profile</button>
+        </form>
+      </section>
 
+      <section class="card">
+        <h2>3) Icebreaker Questionnaire</h2>
+        <p class="helper">Answer at least 3 of 13 questions.</p>
+        <form id="questionnaire-form">
+          <div id="question-list" class="question-list"></div>
+          <button type="submit">Save Answers</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>4) Privacy + Consent</h2>
+        <form id="consent-form">
           <label class="checkbox-row">
             <input id="privacy-consent" type="checkbox" required />
-            I agree to the event privacy policy
+            I agree to the privacy policy and attendee conduct terms
           </label>
-
           <label class="checkbox-row">
-            <input id="auto-delete" type="checkbox" />
-            Delete my data 24h after event
+            <input id="auto-delete" type="checkbox" checked />
+            Delete my data 24h after event (default enabled)
           </label>
-
           <button type="submit">Complete Onboarding</button>
         </form>
       </section>
 
       <section class="card">
-        <h2>2) AI Match Wave</h2>
-        <p id="wave-status">No wave loaded yet.</p>
-        <button id="load-wave">Load Mock Match Wave</button>
+        <h2>5) Match Queue</h2>
+        <p id="wave-status">Complete onboarding to load your wave.</p>
+        <div class="button-row">
+          <button id="load-wave" type="button">Load Current Wave</button>
+          <button id="trigger-wave" type="button">Operator: Send Next Wave</button>
+        </div>
         <ul id="match-list"></ul>
       </section>
 
       <section class="card">
-        <h2>3) Privacy Vault</h2>
-        <p>Contacts unlock only after mutual like.</p>
+        <h2>6) Privacy Vault</h2>
+        <p>WhatsApp is shown only after mutual like.</p>
         <ul id="connections-list"></ul>
       </section>
 
       <section class="card owner-panel">
-        <h2>William Owner Panel (Frontend Scope)</h2>
+        <h2>William Frontend Scope</h2>
         <ul>
-          <li>QR onboarding completion state</li>
-          <li>Tag validation and UX feedback</li>
-          <li>Match wave rendering and actions</li>
-          <li>Mutual-like privacy unlock states</li>
+          <li>Auth entry with demo fallback</li>
+          <li>3+3 tag, consent, and min-3 questionnaire validation</li>
+          <li>Wave queue with like/pass integration path</li>
+          <li>Mutual-match WhatsApp reveal gating states</li>
+          <li>Manual operator wave trigger control</li>
         </ul>
       </section>
     </main>
+
+    <section class="status-bar">
+      <strong>Status:</strong>
+      <span id="app-status">Waiting for auth step.</span>
+    </section>
 
     <script src="./main.js" type="module"></script>
   </body>
