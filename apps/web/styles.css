@@ -4,135 +4,190 @@
 
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
-  background: #f4f6fb;
-  color: #1f2937;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+  color: #f8fafc;
+  background: radial-gradient(circle at top, #312e81, #0f172a 60%);
+  min-height: 100vh;
 }
 
-.topbar {
-  padding: 20px;
-  background: #111827;
-  color: #f9fafb;
+.mobile-shell {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 20px 14px 90px;
 }
 
-.topbar h1 {
+.app-header {
+  margin-bottom: 14px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: #a5b4fc;
+  letter-spacing: 0.12em;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+h1 {
   margin: 0;
+  font-size: 28px;
+  line-height: 1.15;
 }
 
-.topbar p {
-  margin: 6px 0 0;
+h2 {
+  margin: 0 0 8px;
+  color: #1e1b4b;
+}
+
+.subtitle {
+  margin: 8px 0 0;
   color: #cbd5e1;
 }
 
-.layout {
-  display: grid;
-  gap: 16px;
+.glass-card {
+  backdrop-filter: blur(8px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(238, 242, 255, 0.95));
+  border-radius: 22px;
   padding: 16px;
-  grid-template-columns: 1fr;
-  max-width: 720px;
-  margin: 0 auto;
+  color: #0f172a;
+  box-shadow: 0 14px 35px rgba(15, 23, 42, 0.3);
 }
 
-.card {
-  background: #ffffff;
-  border-radius: 10px;
-  padding: 16px;
-  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.08);
+.step-pill {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.stack {
+  display: grid;
+  gap: 10px;
 }
 
 label {
-  display: block;
-  margin-bottom: 12px;
+  display: grid;
+  gap: 6px;
   font-size: 14px;
 }
 
 input,
 select,
-button {
+button,
+.link-btn {
   width: 100%;
-  margin-top: 6px;
-  padding: 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 14px;
+  padding: 12px;
+  font-size: 15px;
+  border: 1px solid #cbd5e1;
 }
 
-button {
-  border: 0;
-  background: #2563eb;
+input,
+select {
+  background: #fff;
+}
+
+button,
+.link-btn {
+  border: none;
+  font-weight: 700;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
   color: #fff;
-  font-weight: 600;
-  cursor: pointer;
 }
 
-button:hover {
-  background: #1d4ed8;
+.ghost-btn {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.helper {
+  margin: 0 0 12px;
+  color: #475569;
 }
 
 .checkbox-row {
   display: flex;
-  gap: 10px;
   align-items: center;
+  gap: 10px;
+  background: #f1f5f9;
+  border-radius: 12px;
+  padding: 10px;
 }
 
 .checkbox-row input {
   width: auto;
-  margin-top: 0;
+  margin: 0;
 }
 
-ul {
-  padding-left: 18px;
-}
-
-.owner-panel {
-  border: 1px dashed #60a5fa;
-}
-
-.helper {
-  color: #475569;
-  margin-top: 0;
-}
-
-.question-list {
+.question-list,
+.candidate-list,
+.vault-list {
   display: grid;
   gap: 10px;
-  margin-bottom: 12px;
+  padding: 0;
+  list-style: none;
+  margin: 0 0 12px;
 }
 
-.question-row {
-  padding: 10px;
+.question-row,
+.candidate-card,
+.vault-item {
+  background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.question-row input {
-  width: 100%;
+  border-radius: 14px;
+  padding: 12px;
 }
 
 .button-row {
-  display: flex;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
   margin-bottom: 12px;
 }
 
-.button-row button {
-  margin-top: 0;
+.candidate-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.link-btn {
+  display: inline-block;
+  text-decoration: none;
+  text-align: center;
 }
 
 .status-bar {
-  position: sticky;
+  position: fixed;
+  left: 0;
+  right: 0;
   bottom: 0;
-  background: #0f172a;
+  padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.95);
   color: #e2e8f0;
-  padding: 10px 16px;
-  border-top: 1px solid #1e293b;
+  border-top: 1px solid rgba(148, 163, 184, 0.3);
+  font-size: 14px;
 }
 
 .status-error {
-  color: #b91c1c;
+  color: #fca5a5;
 }
 
 .status-success {
-  color: #166534;
+  color: #86efac;
+}
+
+@media (min-width: 640px) {
+  .mobile-shell {
+    padding-top: 34px;
+  }
+
+  .button-row {
+    grid-template-columns: 1fr 1fr;
+  }
 }

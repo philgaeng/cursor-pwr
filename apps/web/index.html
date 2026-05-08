@@ -3,123 +3,41 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NexusLink Web MVP</title>
+    <title>NexusLink - Auth</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
-    <header class="topbar">
-      <h1>NexusLink</h1>
-      <p>William Ownership Starter - Frontend MVP</p>
-    </header>
+  <body data-page="auth">
+    <main class="mobile-shell">
+      <header class="app-header">
+        <p class="eyebrow">NexusLink</p>
+        <h1>Start Networking Fast</h1>
+        <p class="subtitle">Sign in and unlock your AI-powered match flow.</p>
+      </header>
 
-    <main class="layout">
-      <section class="card">
-        <h2>1) Auth Entry</h2>
-        <p class="helper">MVP default is Google; demo mode keeps the flow reliable offline.</p>
-        <form id="auth-form">
+      <section class="glass-card">
+        <div class="step-pill">Step 1 of 6</div>
+        <h2>Auth Entry</h2>
+        <p class="helper">Google is default. LinkedIn works in demo mode.</p>
+        <form id="auth-form" class="stack">
           <label>
             Sign in Provider
             <select id="provider" required>
               <option value="google">Google</option>
-              <option value="linkedin">LinkedIn (Fallback UI)</option>
+              <option value="linkedin">LinkedIn</option>
             </select>
           </label>
           <label class="checkbox-row">
             <input id="demo-mode" type="checkbox" />
-            Enable demo mode login fallback
+            Enable demo mode fallback
           </label>
-          <button type="submit">Continue</button>
+          <button type="submit">Continue to Profile</button>
         </form>
-      </section>
-
-      <section class="card">
-        <h2>2) Profile + Tags</h2>
-        <form id="profile-form">
-          <label>
-            Full Name
-            <input id="full-name" required placeholder="Alex Rivera" />
-          </label>
-          <label>
-            Role
-            <input id="role" required placeholder="Founder" />
-          </label>
-          <label>
-            Company
-            <input id="company" required placeholder="Nexus Labs" />
-          </label>
-          <label>
-            WhatsApp
-            <input id="whatsapp" required placeholder="+65 9123 4567" />
-          </label>
-          <label>
-            What I Offer (comma separated, exactly 3)
-            <input id="offer-tags" required placeholder="Venture Capital, Partnerships, Hiring" />
-          </label>
-          <label>
-            What I am Looking For (comma separated, exactly 3)
-            <input id="seek-tags" required placeholder="AI Engineer, Seed Investor, Pilot Clients" />
-          </label>
-          <button type="submit">Save Profile</button>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>3) Icebreaker Questionnaire</h2>
-        <p class="helper">Answer at least 3 of 13 questions.</p>
-        <form id="questionnaire-form">
-          <div id="question-list" class="question-list"></div>
-          <button type="submit">Save Answers</button>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>4) Privacy + Consent</h2>
-        <form id="consent-form">
-          <label class="checkbox-row">
-            <input id="privacy-consent" type="checkbox" required />
-            I agree to the privacy policy and attendee conduct terms
-          </label>
-          <label class="checkbox-row">
-            <input id="auto-delete" type="checkbox" checked />
-            Delete my data 24h after event (default enabled)
-          </label>
-          <button type="submit">Complete Onboarding</button>
-        </form>
-      </section>
-
-      <section class="card">
-        <h2>5) Match Queue</h2>
-        <p id="wave-status">Complete onboarding to load your wave.</p>
-        <div class="button-row">
-          <button id="load-wave" type="button">Load Current Wave</button>
-          <button id="trigger-wave" type="button">Operator: Send Next Wave</button>
-        </div>
-        <ul id="match-list"></ul>
-      </section>
-
-      <section class="card">
-        <h2>6) Privacy Vault</h2>
-        <p>WhatsApp is shown only after mutual like.</p>
-        <ul id="connections-list"></ul>
-      </section>
-
-      <section class="card owner-panel">
-        <h2>William Frontend Scope</h2>
-        <ul>
-          <li>Auth entry with demo fallback</li>
-          <li>3+3 tag, consent, and min-3 questionnaire validation</li>
-          <li>Wave queue with like/pass integration path</li>
-          <li>Mutual-match WhatsApp reveal gating states</li>
-          <li>Manual operator wave trigger control</li>
-        </ul>
       </section>
     </main>
 
-    <section class="status-bar">
-      <strong>Status:</strong>
+    <footer class="status-bar">
       <span id="app-status">Waiting for auth step.</span>
-    </section>
-
+    </footer>
     <script src="./main.js" type="module"></script>
   </body>
 </html>

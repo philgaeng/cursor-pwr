@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NexusLink - Match Queue</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-page="queue">
+    <main class="mobile-shell">
+      <header class="app-header">
+        <p class="eyebrow">NexusLink</p>
+        <h1>Your Match Queue</h1>
+        <p class="subtitle">Review candidates and like/pass in seconds.</p>
+      </header>
+      <section class="glass-card">
+        <div class="step-pill">Step 5 of 6</div>
+        <p id="wave-status" class="helper">Load your current wave to start.</p>
+        <div class="button-row">
+          <button id="load-wave" type="button">Load Current Wave</button>
+          <button id="trigger-wave" type="button" class="ghost-btn">Operator: Send Next Wave</button>
+        </div>
+        <ul id="match-list" class="candidate-list"></ul>
+      </section>
+    </main>
+    <footer class="status-bar">
+      <span id="app-status">No wave loaded yet.</span>
+    </footer>
+    <script src="./main.js" type="module"></script>
+  </body>
+</html>
