@@ -44,5 +44,6 @@ Optional environment variables:
 
 ## Notes
 
-- Data store is in-memory for demo reliability.
+- Data store is JSON-backed at `apps/api/data/store.json` (survives restart).
+- This JSON persistence is demo-friendly; migrate to a proper DB for concurrent/production usage.
 - Payload shapes follow canonical contracts in `packages/shared/contracts.ts`.

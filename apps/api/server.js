@@ -1,5 +1,7 @@
 const http = require("node:http");
 const { randomUUID } = require("node:crypto");
+const fs = require("node:fs/promises");
+const path = require("node:path");
 
 const HOST = process.env.API_HOST || "127.0.0.1";
 const PORT = Number(process.env.API_PORT || 8787);
@@ -29,6 +31,8 @@ const GLOBAL_TAG_CATALOG = Object.freeze({
 });
 
 const EVENT_ID = "demo-event-2026";
+const DATA_DIR = path.join(__dirname, "data");
+const DATA_FILE = path.join(DATA_DIR, "store.json");
 
 const store = {
   sessions: new Map(),
@@ -36,6 +40,58 @@ const store = {
   onboardingDrafts: new Map(),
   actions: new Map(),
   wavesByEvent: new Map(),
+};
+
+const hydrateMap = (map, entries) => {
+  map.clear();
+  if (!Array.isArray(entries)) {
+    return;
+  }
+  entries.forEach((entry) => {
+    if (!entry || typeof entry !== "object") {
+      return;
+    }
+    if (!Object.prototype.hasOwnProperty.call(entry, "key")) {
+      return;
+    }
+    map.set(entry.key, entry.value);
+  });
+};
+
+const loadStoreFromDisk = async () => {
+  try {
+    const raw = await fs.readFile(DATA_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    hydrateMap(store.sessions, parsed.sessions);
+    hydrateMap(store.profiles, parsed.profiles);
+    hydrateMap(store.onboardingDrafts, parsed.onboardingDrafts);
+    hydrateMap(store.actions, parsed.actions);
+    hydrateMap(store.wavesByEvent, parsed.wavesByEvent);
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      await fs.mkdir(DATA_DIR, { recursive: true });
+      await fs.writeFile(DATA_FILE, JSON.stringify({}, null, 2), "utf8");
+      return;
+    }
+    throw error;
+  }
+};
+
+const persistStoreToDisk = async () => {
+  const snapshot = {
+    sessions: Array.from(store.sessions.entries()).map(([key, value]) => ({ key, value })),
+    profiles: Array.from(store.profiles.entries()).map(([key, value]) => ({ key, value })),
+    onboardingDrafts: Array.from(store.onboardingDrafts.entries()).map(([key, value]) => ({
+      key,
+      value,
+    })),
+    actions: Array.from(store.actions.entries()).map(([key, value]) => ({ key, value })),
+    wavesByEvent: Array.from(store.wavesByEvent.entries()).map(([key, value]) => ({ key, value })),
+  };
+  const tempFile = `${DATA_FILE}.tmp`;
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(tempFile, JSON.stringify(snapshot, null, 2), "utf8");
+  await fs.rename(tempFile, DATA_FILE);
 };
 
 const sendJson = (res, statusCode, payload) => {
@@ -214,6 +270,7 @@ const route = async (req, res) => {
         demoMode: Boolean(body.demoMode),
         createdAt: new Date().toISOString(),
       });
+      await persistStoreToDisk();
       sendJson(res, 200, { ok: true, userId, provider, demoMode: Boolean(body.demoMode) });
       return;
     }
@@ -230,6 +287,7 @@ const route = async (req, res) => {
         demoMode: true,
         createdAt: new Date().toISOString(),
       });
+      await persistStoreToDisk();
       sendJson(res, 200, {
         ok: true,
         userId,
@@ -271,6 +329,7 @@ const route = async (req, res) => {
         seeks: seeks.map((x) => x.trim()),
         whatsapp: isNonEmptyString(body.whatsapp) ? body.whatsapp.trim() : undefined,
       };
+      await persistStoreToDisk();
       sendJson(res, 200, { ok: true, userId, profileSaved: true });
       return;
     }
@@ -293,6 +352,7 @@ const route = async (req, res) => {
         return;
       }
       draft.icebreakerResponses = responses;
+      await persistStoreToDisk();
       sendJson(res, 200, { ok: true, userId, questionCount: responses.length });
       return;
     }
@@ -361,6 +421,7 @@ const route = async (req, res) => {
         whatsapp: body.whatsapp || draft.profile?.whatsapp,
       };
       store.profiles.set(userId, profile);
+      await persistStoreToDisk();
       sendJson(res, 200, { ok: true, userId, profile });
       return;
     }
@@ -381,6 +442,7 @@ const route = async (req, res) => {
       }
       const wave = createWave(EVENT_ID);
       store.wavesByEvent.set(EVENT_ID, wave);
+      await persistStoreToDisk();
       sendJson(res, 200, wave);
       return;
     }
@@ -396,6 +458,7 @@ const route = async (req, res) => {
       }
       const wave = createWave(EVENT_ID);
       store.wavesByEvent.set(EVENT_ID, wave);
+      await persistStoreToDisk();
       sendJson(res, 200, wave);
       return;
     }
@@ -429,6 +492,7 @@ const route = async (req, res) => {
         action: body.action,
         actedAt: new Date().toISOString(),
       });
+      await persistStoreToDisk();
 
       const isMutual = body.action === "like" && body.targetUserId === "u2";
       const mutualMatch = {
@@ -462,8 +526,19 @@ const route = async (req, res) => {
 
 const server = http.createServer(route);
 
-server.listen(PORT, HOST, () => {
-  process.stdout.write(
-    `[apps/api] listening on http://${HOST}:${PORT} (demoMode=${DEMO_MODE_ENABLED})\n`
-  );
-});
+loadStoreFromDisk()
+  .then(() => {
+    server.listen(PORT, HOST, () => {
+      process.stdout.write(
+        `[apps/api] listening on http://${HOST}:${PORT} (demoMode=${DEMO_MODE_ENABLED})\n`
+      );
+    });
+  })
+  .catch((error) => {
+    process.stderr.write(
+      `[apps/api] failed to initialize persistent store: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }\n`
+    );
+    process.exit(1);
+  });
