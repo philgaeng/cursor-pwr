@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NexusLink Web MVP</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>NexusLink</h1>
+      <p>William Ownership Starter - Frontend MVP</p>
+    </header>
+
+    <main class="layout">
+      <section class="card">
+        <h2>1) Onboarding (QR Entry)</h2>
+        <form id="onboarding-form">
+          <label>
+            Sign in Provider
+            <select id="provider" required>
+              <option value="google">Google</option>
+              <option value="linkedin">LinkedIn</option>
+            </select>
+          </label>
+
+          <label>
+            What I Offer (comma separated, 3)
+            <input id="offer-tags" placeholder="Venture Capital, Partnerships, Hiring" required />
+          </label>
+
+          <label>
+            What I'm Looking For (comma separated, 3)
+            <input id="seek-tags" placeholder="AI Engineer, Seed Investor, Pilot Clients" required />
+          </label>
+
+          <label class="checkbox-row">
+            <input id="privacy-consent" type="checkbox" required />
+            I agree to the event privacy policy
+          </label>
+
+          <label class="checkbox-row">
+            <input id="auto-delete" type="checkbox" />
+            Delete my data 24h after event
+          </label>
+
+          <button type="submit">Complete Onboarding</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>2) AI Match Wave</h2>
+        <p id="wave-status">No wave loaded yet.</p>
+        <button id="load-wave">Load Mock Match Wave</button>
+        <ul id="match-list"></ul>
+      </section>
+
+      <section class="card">
+        <h2>3) Privacy Vault</h2>
+        <p>Contacts unlock only after mutual like.</p>
+        <ul id="connections-list"></ul>
+      </section>
+
+      <section class="card owner-panel">
+        <h2>William Owner Panel (Frontend Scope)</h2>
+        <ul>
+          <li>QR onboarding completion state</li>
+          <li>Tag validation and UX feedback</li>
+          <li>Match wave rendering and actions</li>
+          <li>Mutual-like privacy unlock states</li>
+        </ul>
+      </section>
+    </main>
+
+    <script src="./main.js" type="module"></script>
+  </body>
+</html>
