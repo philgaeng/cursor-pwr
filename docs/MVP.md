@@ -2,64 +2,110 @@
 
 This file is the live source of truth for MVP scope.
 
+Contract source of truth: `packages/shared/task-contracts.ts` (`CONTRACT_VERSION = "v1"`).
+PR/integration gate checklist: `docs/ACCEPTANCE_CRITERIA.md`.
+
 ## Problem Statement
 
-Event attendees struggle to find high-intent connections quickly. Existing networking is noisy, random, and often fails to produce valuable follow-up conversations. NexusLink solves this by using AI-assisted matchmaking and privacy-safe introductions during live events.
+Small teams need a simple way to track tasks in one place without complex setup.
+The MVP must let users create, view, update, and complete tasks reliably through a
+single web interface backed by a working API.
 
 ## Target Users
 
-- Event attendees (founders, investors, operators, developers) at conferences, demo days, and curated networking sessions.
-- Event organizers who want to improve participant outcomes and increase event value.
+- Small student/project teams (3-10 people)
+- Users who need fast task capture and status tracking
+- Teams working in short cycles and presenting progress demos
 
 ## MVP Features (Must Have)
 
-- **Seamless onboarding from entry QR**
-  - User scans QR and opens a web portal (no app install).
-  - User signs in with LinkedIn or Google.
-  - User selects 3 tags for "What I Offer" and 3 tags for "What I'm Looking For".
-- **AI matchmaking waves**
-  - Semantic matching pairs users by intent (not exact keyword only).
-  - Match suggestions are sent in periodic waves to avoid notification fatigue.
-  - User can review suggested matches and like/pass each profile.
-- **Privacy vault and double opt-in**
-  - Contact details are hidden until both users like each other.
-  - Mandatory privacy agreement before onboarding is completed.
-  - Optional "delete my data 24h after event" toggle.
+1. Task list page that shows all tasks with status.
+2. Create task flow with required fields:
+   - title (required)
+   - description (optional)
+   - assignee (optional)
+   - due date (optional)
+3. Update task status:
+   - `todo`
+   - `in_progress`
+   - `done`
+4. Edit task details (title/description/assignee/due date).
+5. Delete task.
+6. Basic filtering by status on the web UI.
+7. API + frontend integration using shared contracts in `packages/shared/`.
 
 ## Non-Goals (Out of Scope)
 
-- Native iOS/Android app.
-- Advanced analytics dashboard for organizers.
-- Multi-event profile history and long-term CRM features.
+- Authentication/authorization
+- Notifications (email, push, SMS)
+- File attachments
+- Real-time collaboration/websockets
+- Advanced analytics/reporting
 
 ## Acceptance Criteria
 
-- [ ] User can complete onboarding via web QR flow and select offer/seek tags.
-- [ ] User receives at least one AI match wave and can like/pass profiles.
-- [ ] Mutual like unlocks contact reveal; non-mutual likes keep contacts private.
-- [ ] User can opt into automatic data deletion after 24 hours.
-- [ ] Frontend and backend contracts are aligned.
-- [ ] Critical path errors are handled with clear messaging.
-- [ ] MVP is demo-ready for the team.
+- [ ] User can create a task from UI and see it appear immediately in the list.
+- [ ] User can move a task from `todo` to `in_progress` to `done`.
+- [ ] User can edit and delete a task without page-breaking errors.
+- [ ] Status filter works for all three statuses.
+- [ ] Frontend and backend use shared task types from `packages/shared/`.
+- [ ] API returns consistent error shape for invalid input and missing task.
+- [ ] End-to-end happy path is documented and manually testable in under 5 minutes.
+- [ ] MVP is demo-ready locally for all team members.
+
+## Core User Flow (Demo Path)
+
+1. Open app and view task list.
+2. Create one new task with title and optional details.
+3. Change status from `todo` -> `in_progress` -> `done`.
+4. Edit the task title.
+5. Filter by `done` and verify the task appears.
+6. Delete the task and verify it is removed.
+
+## API Contract Expectations (MVP)
+
+Minimum endpoints:
+
+- `GET /tasks` - list tasks
+- `POST /tasks` - create task
+- `PATCH /tasks/:id` - update task
+- `DELETE /tasks/:id` - delete task
+
+Minimum task shape:
+
+- `id: string`
+- `title: string`
+- `description?: string`
+- `assignee?: string`
+- `dueDate?: string` (ISO date)
+- `status: "todo" | "in_progress" | "done"`
+- `createdAt: string` (ISO datetime)
+- `updatedAt: string` (ISO datetime)
+
+Error response shape:
+
+- `error.code: string`
+- `error.message: string`
+- `error.details?: unknown`
 
 ## Milestones and Ownership
 
-- **William (Frontend Lead)**
-  - Build web onboarding flow (QR landing, auth entry, intent tag capture, privacy agreement).
-  - Build match wave inbox and like/pass interaction screens.
-  - Build privacy vault UI states (double opt-in pending/unlocked contacts, deletion toggle).
-- **Philippe (Backend Lead)**
-  - Implement auth/session and profile ingestion endpoints.
-  - Implement matchmaking orchestration and wave delivery endpoints.
-  - Implement mutual-like gating and contact reveal logic.
-- **Rojel (Integration + Delivery Lead)**
-  - Define shared contracts for profiles, matches, likes, and privacy settings.
-  - Validate contract compatibility with frontend/backend integration tests.
-  - Own release checks and demo readiness.
+- **William (Frontend)**
+  - Build task list UI and forms
+  - Implement status filter and task editing interactions
+  - Wire web app to shared contracts
+- **Philippe (Backend)**
+  - Implement task CRUD endpoints
+  - Add validation and consistent error responses
+  - Keep API aligned with shared contracts
+- **Rojel (Integration/QA)**
+  - Finalize shared contract definitions in `packages/shared/`
+  - Verify end-to-end integration and smoke tests
+  - Maintain MVP checklist and demo readiness
 
 ## Open Questions
 
-- Should matchmaking waves be every fixed interval (for example, 15 minutes) or adaptive to user activity?
-- Should organizers moderate allowed intent tags per event?
-- What fallback is needed if LinkedIn auth is unavailable at runtime?
+- Should due date include time or date-only for MVP?
+- Persist data in-memory only or lightweight local DB for demo stability?
+- Do we need pagination, or is full list acceptable for MVP?
 
