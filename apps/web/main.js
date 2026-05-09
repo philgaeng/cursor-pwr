@@ -1,18 +1,4 @@
-const ICEBREAKER_QUESTIONS = [
-  "What is one meaningful outcome you want from this event?",
-  "Which industry trend are you watching most closely this year?",
-  "What type of collaboration are you open to right now?",
-  "What is your strongest superpower in your current role?",
-  "What challenge are you actively trying to solve this quarter?",
-  "Which market or customer segment are you focused on?",
-  "What does a great intro look like for you?",
-  "What kind of partner would be most valuable to meet here?",
-  "What signal tells you a project has strong execution potential?",
-  "What is one lesson from a recent failure you now apply often?",
-  "Which metric matters most in your current work?",
-  "What capability are you looking to add to your team?",
-  "What topic can you discuss for hours with high energy?",
-];
+const REQUIRED_ASSIGNED_ROUTES = 3;
 
 const API_BASE_URL = (window.API_BASE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
 const STORAGE_KEY = "nexuslink-web-state-v2";
@@ -39,6 +25,9 @@ const defaultState = {
   eventId: null,
   profile: null,
   answers: [],
+  icebreakerResponses: [],
+  assignedRouteIds: [],
+  routeCatalogVersion: null,
   consent: null,
   onboardingComplete: false,
   wave: null,
@@ -74,10 +63,19 @@ const navigate = (path) => {
   window.location.href = path;
 };
 
+const shuffle = (items) => {
+  const clone = [...items];
+  for (let i = clone.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [clone[i], clone[j]] = [clone[j], clone[i]];
+  }
+  return clone;
+};
+
 const ensureStep = () => {
   if (page !== "auth" && !state.auth) navigate("./index.html");
   if (["questions", "consent", "queue", "vault"].includes(page) && !state.profile) navigate("./profile.html");
-  if (["consent", "queue", "vault"].includes(page) && state.answers.length < 3) navigate("./questions.html");
+  if (["consent", "queue", "vault"].includes(page) && state.icebreakerResponses.length < 3) navigate("./questions.html");
   if (["queue", "vault"].includes(page) && !state.onboardingComplete) navigate("./consent.html");
 };
 
@@ -130,17 +128,85 @@ const apiFetch = async (path, options = {}) => {
   return response.json();
 };
 
-const renderQuestions = () => {
-  const list = document.getElementById("question-list");
-  if (!list) return;
-  list.innerHTML = "";
-  ICEBREAKER_QUESTIONS.forEach((question, index) => {
-    const row = document.createElement("div");
-    row.className = "question-row";
-    const existing = state.answers[index] || "";
-    row.innerHTML = `<label>Q${index + 1}. ${question}<input data-question-index="${index}" value="${existing}" placeholder="Optional answer" /></label>`;
-    list.appendChild(row);
-  });
+const renderRouteBuilder = (container, route, existing = null) => {
+  const card = document.createElement("div");
+  card.className = "question-row";
+  card.dataset.routeId = route.routeId;
+  card.innerHTML = `
+    <h3>${route.title}</h3>
+    <label>${route.tier1Prompt}
+      <select data-field="tier1">
+        <option value="">Select an option</option>
+        ${route.tier1Options
+          .map((opt) => `<option value="${opt.code}">${opt.label}</option>`)
+          .join("")}
+      </select>
+    </label>
+    <div data-slot="tier2"></div>
+    <div data-slot="tier3"></div>
+    <label data-slot="freeText"><span data-field="freeTextLabel">${route.freeTextPrompt || "Optional: share one specific example"}</span>
+      <input data-field="freeText" placeholder="Optional free text" />
+    </label>
+  `;
+  container.appendChild(card);
+
+  const tier1Select = card.querySelector("select[data-field='tier1']");
+  const tier2Slot = card.querySelector("[data-slot='tier2']");
+  const tier3Slot = card.querySelector("[data-slot='tier3']");
+  const freeTextInput = card.querySelector("input[data-field='freeText']");
+
+  const renderTier2 = () => {
+    tier2Slot.innerHTML = "";
+    tier3Slot.innerHTML = "";
+    const tier1Value = tier1Select.value;
+    if (!tier1Value) return;
+    const tier1Option = route.tier1Options.find((opt) => opt.code === tier1Value);
+    if (!tier1Option) return;
+    const label = document.createElement("label");
+    label.textContent = tier1Option.tier2Prompt;
+    const select = document.createElement("select");
+    select.dataset.field = "tier2";
+    select.innerHTML = `<option value="">Select an option</option>${tier1Option.tier2Options
+      .map((opt) => `<option value="${opt}">${opt.replace(/_/g, " ")}</option>`)
+      .join("")}`;
+    label.appendChild(select);
+    tier2Slot.appendChild(label);
+    select.addEventListener("change", () => renderTier3(tier1Option, select.value));
+    if (existing?.tier2) {
+      select.value = existing.tier2;
+      renderTier3(tier1Option, existing.tier2, existing.tier3 || []);
+    }
+  };
+
+  const renderTier3 = (tier1Option, tier2Value, existingTier3 = []) => {
+    tier3Slot.innerHTML = "";
+    if (!tier2Value) return;
+    const tier3ByTier2 = tier1Option.tier3ByTier2 || {};
+    const questions = tier3ByTier2[tier2Value] || [];
+    questions.forEach((question, index) => {
+      const label = document.createElement("label");
+      label.textContent = question.prompt;
+      const select = document.createElement("select");
+      select.dataset.field = `tier3-${index}`;
+      select.innerHTML = `<option value="">Select an option</option>${question.options
+        .map((opt) => `<option value="${opt}">${opt.replace(/_/g, " ")}</option>`)
+        .join("")}`;
+      if (existingTier3[index]) select.value = existingTier3[index];
+      label.appendChild(select);
+      tier3Slot.appendChild(label);
+    });
+    const override = tier1Option.freeTextPromptOverride || route.freeTextPrompt || "Optional free text";
+    const freeTextLabel = card.querySelector("[data-field='freeTextLabel']");
+    if (freeTextLabel) freeTextLabel.textContent = override;
+  };
+
+  tier1Select.addEventListener("change", renderTier2);
+
+  if (existing) {
+    tier1Select.value = existing.tier1 || "";
+    freeTextInput.value = existing.freeText || "";
+    renderTier2();
+  }
 };
 
 const renderWave = () => {
@@ -438,26 +504,87 @@ const bindProfilePage = () => {
 
 const bindQuestionsPage = () => {
   const form = document.getElementById("questionnaire-form");
-  if (!form) return;
-  renderQuestions();
+  const list = document.getElementById("question-list");
+  if (!form || !list) return;
+
+  const hydrate = async () => {
+    try {
+      const catalog = await apiFetch("/api/routes/catalog", { method: "GET" });
+      const routes = Array.isArray(catalog.routes) ? catalog.routes : [];
+      if (routes.length === 0) {
+        setStatus("No route catalog available.", "error");
+        return;
+      }
+      state.routeCatalogVersion = catalog.version || "v1";
+      if (!Array.isArray(state.assignedRouteIds) || state.assignedRouteIds.length !== REQUIRED_ASSIGNED_ROUTES) {
+        state.assignedRouteIds = shuffle(routes.map((r) => r.routeId)).slice(0, REQUIRED_ASSIGNED_ROUTES);
+      }
+      const assignedRoutes = state.assignedRouteIds
+        .map((id) => routes.find((route) => route.routeId === id))
+        .filter(Boolean);
+      const existingByRoute = new Map(
+        (state.icebreakerResponses || []).map((entry) => [entry.routeId, entry])
+      );
+      list.innerHTML = "";
+      assignedRoutes.forEach((route) => {
+        renderRouteBuilder(list, route, existingByRoute.get(route.routeId));
+      });
+      saveState(state);
+      setStatus(`Complete ${REQUIRED_ASSIGNED_ROUTES} routes to continue.`, "info");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Unable to load route catalog.", "error");
+    }
+  };
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const answers = Array.from(document.querySelectorAll("input[data-question-index]"))
-      .map((input) => input.value.trim())
-      .filter(Boolean);
-    if (answers.length < 3) {
-      setStatus("Answer at least 3 questions.", "error");
+    const cards = Array.from(list.querySelectorAll("[data-route-id]"));
+    const responses = [];
+
+    for (const card of cards) {
+      const routeId = card.dataset.routeId;
+      const tier1 = card.querySelector("select[data-field='tier1']")?.value || "";
+      const tier2 = card.querySelector("select[data-field='tier2']")?.value || "";
+      const tier3 = Array.from(card.querySelectorAll("select[data-field^='tier3-']"))
+        .map((input) => input.value)
+        .filter(Boolean);
+      const freeText = card.querySelector("input[data-field='freeText']")?.value.trim() || "";
+      if (!routeId || !tier1 || !tier2 || tier3.length < 2) {
+        setStatus("Please answer all required route selections.", "error");
+        return;
+      }
+      responses.push({
+        questionId: `${routeId}:${tier1}:${tier2}`,
+        answer: `${tier1} > ${tier2} > ${tier3.join(", ")}`,
+        routeId,
+        tier1,
+        tier2,
+        tier3,
+        freeText,
+        answeredAt: new Date().toISOString(),
+      });
+    }
+
+    if (responses.length < REQUIRED_ASSIGNED_ROUTES) {
+      setStatus(`Answer all ${REQUIRED_ASSIGNED_ROUTES} assigned routes.`, "error");
       return;
     }
+
     try {
-      await apiFetch("/api/onboarding/questions", { method: "POST", body: JSON.stringify({ answers }) });
-      state.answers = answers;
+      await apiFetch("/api/onboarding/questions", {
+        method: "POST",
+        body: JSON.stringify({ icebreakerResponses: responses }),
+      });
+      state.icebreakerResponses = responses;
+      state.answers = responses.map((response) => response.answer);
       saveState(state);
       navigate("./consent.html");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Questionnaire save failed.", "error");
     }
   });
+
+  hydrate();
 };
 
 const bindConsentPage = () => {
@@ -486,7 +613,7 @@ const bindConsentPage = () => {
           company: state.profile.company,
           email: state.profile.email,
           whatsapp: state.profile.whatsapp,
-          answers: state.answers,
+          icebreakerResponses: state.icebreakerResponses,
         }),
       });
       state.consent = { consentAccepted, autoDeleteAfter24h };
