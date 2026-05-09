@@ -94,8 +94,8 @@ const buildDefaultOrganizerSettings = () => ({
   },
   parameters: {
     onboarding: {
-      requiredOfferTags: 3,
-      requiredSeekTags: 3,
+      requiredOfferTags: 1,
+      requiredSeekTags: 1,
       requiredIcebreakerAnswers: 3,
       requiredAssignedRoutesPerParticipant: 3,
       onboardingResumeTimeoutSeconds: 180,
@@ -262,9 +262,9 @@ const parseJsonBody = async (req) => {
 const isNonEmptyString = (value) =>
   typeof value === "string" && value.trim().length > 0;
 
-const isTripleTags = (value) =>
+const hasMinimumTags = (value, minCount) =>
   Array.isArray(value) &&
-  value.length === 3 &&
+  value.length >= minCount &&
   value.every((item) => isNonEmptyString(item));
 
 const isIcebreakerResponses = (value) =>
@@ -708,10 +708,12 @@ const route = async (req, res) => {
 
       const offers = body.offers || body.whatIOffer;
       const seeks = body.seeks || body.whatISeek;
-      if (!isTripleTags(offers) || !isTripleTags(seeks)) {
+      const minOfferTags = organizerSettings.parameters.onboarding.requiredOfferTags || 1;
+      const minSeekTags = organizerSettings.parameters.onboarding.requiredSeekTags || 1;
+      if (!hasMinimumTags(offers, minOfferTags) || !hasMinimumTags(seeks, minSeekTags)) {
         sendJson(res, 400, {
           ok: false,
-          error: "Profile requires exactly 3 offer tags and exactly 3 seek tags.",
+          error: `Profile requires at least ${minOfferTags} offer tag(s) and at least ${minSeekTags} seek tag(s).`,
         });
         return;
       }
@@ -786,10 +788,12 @@ const route = async (req, res) => {
           ? body.autoDeleteAfter24h
           : true;
 
-      if (!isTripleTags(offers) || !isTripleTags(seeks)) {
+      const minOfferTags = organizerSettings.parameters.onboarding.requiredOfferTags || 1;
+      const minSeekTags = organizerSettings.parameters.onboarding.requiredSeekTags || 1;
+      if (!hasMinimumTags(offers, minOfferTags) || !hasMinimumTags(seeks, minSeekTags)) {
         sendJson(res, 400, {
           ok: false,
-          error: "Onboarding requires exactly 3 offers and exactly 3 seeks.",
+          error: `Onboarding requires at least ${minOfferTags} offer tag(s) and at least ${minSeekTags} seek tag(s).`,
         });
         return;
       }

@@ -414,10 +414,6 @@ const bindProfilePage = () => {
     if (selectedList.includes(tag)) {
       return selectedList.filter((entry) => entry !== tag);
     }
-    if (selectedList.length >= 3) {
-      setStatus("Select exactly 3 tags per section.", "error");
-      return selectedList;
-    }
     return [...selectedList, tag];
   };
 
@@ -430,12 +426,10 @@ const bindProfilePage = () => {
       if (!(target instanceof HTMLButtonElement)) return;
       selectedOffers = toggleTag(target.dataset.tag, selectedOffers);
       renderTagSelection();
-      if (selectedOffers.length <= 3 && selectedSeeks.length <= 3) {
-        setStatus(
-          `Offer ${selectedOffers.length}/3 • Looking for ${selectedSeeks.length}/3`,
-          "info"
-        );
-      }
+      setStatus(
+        `Offer selected: ${selectedOffers.length} • Looking for selected: ${selectedSeeks.length}`,
+        "info"
+      );
     });
   }
 
@@ -448,12 +442,10 @@ const bindProfilePage = () => {
       if (!(target instanceof HTMLButtonElement)) return;
       selectedSeeks = toggleTag(target.dataset.tag, selectedSeeks);
       renderTagSelection();
-      if (selectedOffers.length <= 3 && selectedSeeks.length <= 3) {
-        setStatus(
-          `Offer ${selectedOffers.length}/3 • Looking for ${selectedSeeks.length}/3`,
-          "info"
-        );
-      }
+      setStatus(
+        `Offer selected: ${selectedOffers.length} • Looking for selected: ${selectedSeeks.length}`,
+        "info"
+      );
     });
   }
 
@@ -463,21 +455,24 @@ const bindProfilePage = () => {
     document.getElementById("company").value = state.profile.company || "";
     document.getElementById("email").value = state.profile.email || "";
     document.getElementById("whatsapp").value = state.profile.whatsapp || "";
-    selectedOffers = Array.isArray(state.profile.offers) ? state.profile.offers.slice(0, 3) : [];
-    selectedSeeks = Array.isArray(state.profile.seeks) ? state.profile.seeks.slice(0, 3) : [];
+    selectedOffers = Array.isArray(state.profile.offers) ? state.profile.offers : [];
+    selectedSeeks = Array.isArray(state.profile.seeks) ? state.profile.seeks : [];
     renderTagSelection();
   }
 
   if (selectedOffers.length === 0 && selectedSeeks.length === 0) {
-    setStatus("Select 3 offer tags and 3 looking-for tags.", "info");
+    setStatus("Select at least 1 offer tag and 1 looking-for tag.", "info");
   } else {
-    setStatus(`Offer ${selectedOffers.length}/3 • Looking for ${selectedSeeks.length}/3`, "info");
+    setStatus(
+      `Offer selected: ${selectedOffers.length} • Looking for selected: ${selectedSeeks.length}`,
+      "info"
+    );
   }
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (selectedOffers.length !== 3 || selectedSeeks.length !== 3) {
-      setStatus("Select exactly 3 offer tags and 3 looking-for tags.", "error");
+    if (selectedOffers.length < 1 || selectedSeeks.length < 1) {
+      setStatus("Select at least 1 offer tag and at least 1 looking-for tag.", "error");
       return;
     }
     const profile = {
