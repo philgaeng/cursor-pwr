@@ -14,21 +14,41 @@ Enable high-value, intent-based networking at live events through AI-powered mat
 4. Attendee reviews suggestions and likes/passes.
 5. Mutual likes unlock private contact reveal and AI icebreakers.
 
+## Feature Modules
+
+- `01_auth`: identity provider sign-in and session bootstrap from QR entry.
+- `02_details_gathering`: attendee profile enrichment, tags, and consent capture.
+- `03_icebreaker_questions`: pre-match question set capture and quality signals.
+- `04_matching_logic`: ranking, wave generation, and suggestion delivery cadence.
+- `05_match_actions_and_reveal`: like/pass flow, mutual match handling, and contact unlock.
+- `06_privacy_and_data_lifecycle`: consent auditability, retention policy, and deletion workflows.
+
+## Module Spec Files
+
+- [01_auth](./features/01_auth.md)
+- [02_details_gathering](./features/02_details_gathering.md)
+- [03_icebreaker_questions](./features/03_icebreaker_questions.md)
+- [04_matching_logic](./features/04_matching_logic.md)
+- [05_match_actions_and_reveal](./features/05_match_actions_and_reveal.md)
+- [06_privacy_and_data_lifecycle](./features/06_privacy_and_data_lifecycle.md)
+
 ## Current Implementation Progress (`apps/web`)
 
 Status legend: `Implemented` = working in current frontend, `Partial` = mock/local-only behavior, `Not Implemented` = not present yet.
 
-### 1) Seamless Onboarding (QR Entry)
+### 01_auth (QR Entry + Provider Login)
 
 - **Web onboarding form**: `Implemented`
 - **3 tags for Offer + 3 tags for Looking For validation**: `Implemented`
 - **Privacy agreement required before completion**: `Implemented`
-- **Provider selection (Google/LinkedIn)**: `Partial` (UI selector exists, no OAuth integration)
+- **Provider selection (LinkedIn-first, Google fallback)**: `Partial` (UI selector exists, no OAuth integration)
 - **QR entry flow**: `Partial` (product copy implies it, no dedicated QR/event route logic)
-- **Profile sync from provider (name/role/company/bio)**: `Not Implemented`
-- **Manual profile edit after sync**: `Not Implemented`
+- **MVP profile sync from provider (name/email/picture)**: `Not Implemented`
+- **Fallback to manual profile entry (name/company/role/email/phone)**: `Not Implemented`
+- **Post-MVP LinkedIn public profile enrichment (username/public URL/CV-like fields)**: `Not Implemented`
+- **Manual profile edit after sync/fallback**: `Not Implemented`
 
-### 2) AI Matchmaking Agent
+### 04_matching_logic (AI Matchmaking Agent)
 
 - **Match wave UI and candidate rendering**: `Implemented`
 - **Like/Pass actions on suggested profiles**: `Implemented`
@@ -36,7 +56,7 @@ Status legend: `Implemented` = working in current frontend, `Partial` = mock/loc
 - **Semantic/context-aware ranking from embeddings**: `Not Implemented`
 - **Proactive push notifications for new waves**: `Not Implemented`
 
-### 3) Privacy and Safety (The Vault)
+### 06_privacy_and_data_lifecycle (The Vault)
 
 - **Double opt-in concept for reveal**: `Partial` (mocked locally in frontend state)
 - **Contact hidden before mutual match**: `Partial` (UI behavior, not backend-enforced)
@@ -44,7 +64,7 @@ Status legend: `Implemented` = working in current frontend, `Partial` = mock/loc
 - **Consent/audit trail persistence**: `Not Implemented`
 - **GDPR/CCPA lifecycle handling**: `Not Implemented`
 
-### 4) High-Stakes Interaction (Like Mechanic)
+### 05_match_actions_and_reveal (Like Mechanic)
 
 - **Queue/list style review of match candidates**: `Implemented`
 - **Immediate feedback on Like/Pass actions**: `Implemented`
@@ -61,30 +81,65 @@ Status legend: `Implemented` = working in current frontend, `Partial` = mock/loc
 
 ## Feature Specifications
 
-### 1) Seamless Onboarding (QR Entry)
+### 01_auth (QR Entry + Provider Login)
 
 **Purpose**
 - Maximize activation by removing app install friction and minimizing input time.
 
 **Functional Requirements**
 - QR code opens a mobile-friendly web onboarding flow.
-- Portal supports sign-in with LinkedIn or Google.
-- Profile sync ingests professional baseline data (name, role, company, bio/headline).
+- Portal defaults to LinkedIn sign-in as the first option on mobile QR onboarding.
+- If LinkedIn sign-in is unavailable or fails, user can continue with Google sign-in.
+- If Google sign-in is unavailable or fails, user can continue with manual profile entry.
+- MVP profile sync ingests identity baseline data available from provider login (name, email, picture) and allows manual completion for networking fields (company, role, phone, tags).
+- Post-MVP profile enrichment may ingest LinkedIn public profile URL and richer professional fields only if restricted/partner API access is approved.
+**UX Requirements**
+- Time-to-complete onboarding target: under 2 minutes.
+- Clear progress indicator (01_auth -> 02_details_gathering -> 03_icebreaker_questions -> done).
+- Keep onboarding no-dead-end: user can always complete via fallback/manual path.
+- Allow manual profile edits after sync or fallback entry.
+
+**Edge Cases**
+- If LinkedIn is unavailable, fallback to Google and then manual profile completion.
+- If user skips required fields/tags, prevent completion with clear prompts.
+
+**LinkedIn Integration Constraints**
+- MVP uses LinkedIn OIDC scopes (`openid profile email`) for fast mobile-web auth.
+- OIDC reliably provides member identity claims (member ID, name, picture, email when present), but does not guarantee LinkedIn vanity username/public profile URL.
+- Retrieving vanity username/public profile URL and richer profile fields depends on restricted/partner-level LinkedIn API access and approval timelines.
+
+### 02_details_gathering (Profile, Tags, and Consent)
+
+**Purpose**
+- Capture high-signal attendee details quickly while keeping onboarding completion high.
+
+**Functional Requirements**
+- User completes networking profile fields (company, role, phone) if provider data is incomplete.
 - User selects exactly 3 tags for:
   - What I Offer
   - What I am Looking For
 - User must accept a privacy and conduct agreement before profile is active.
+- User can edit synced/manual profile fields before entering the matching queue.
 
-**UX Requirements**
-- Time-to-complete onboarding target: under 2 minutes.
-- Clear progress indicator (auth -> profile -> tags -> agreement -> done).
-- Allow manual profile edits after sync.
+**Validation Requirements**
+- Required fields block progression with specific inline guidance.
+- Tag count must be exactly 3 per category before completion.
 
-**Edge Cases**
-- If LinkedIn is unavailable, fallback to Google + manual profile completion.
-- If user skips required fields/tags, prevent completion with clear prompts.
+### 03_icebreaker_questions (Pre-Match Signal Capture)
 
-### 2) AI Matchmaking Agent
+**Purpose**
+- Collect concise conversation signals that improve match quality and post-match engagement.
+
+**Functional Requirements**
+- Present the predefined icebreaker set during onboarding completion.
+- Require minimum 3 answered questions before profile activation.
+- Persist responses in profile payload for matchmaking input.
+
+**Quality Requirements**
+- Question prompts should be short, event-relevant, and non-repetitive.
+- Skipped optional questions should not block completion after the minimum threshold.
+
+### 04_matching_logic (AI Matchmaking Agent)
 
 **Purpose**
 - Surface high-intent, context-aware connections rather than simple keyword overlap.
@@ -105,7 +160,7 @@ Status legend: `Implemented` = working in current frontend, `Partial` = mock/loc
 - Ranking emphasizes intent compatibility first, secondary profile fit second.
 - Cold-start behavior uses available tags + role/company context.
 
-### 3) Privacy and Safety (The Vault)
+### 06_privacy_and_data_lifecycle (Privacy and Safety / The Vault)
 
 **Purpose**
 - Protect attendee trust and enforce consent-first networking.
@@ -121,7 +176,7 @@ Status legend: `Implemented` = working in current frontend, `Partial` = mock/loc
 - Event-scoped data lifecycle controls required (active, archived, deleted).
 - Auditability for consent actions (agreement accepted timestamp, deletion preference).
 
-### 4) High-Stakes Interaction (Like Mechanic)
+### 05_match_actions_and_reveal (High-Stakes Interaction / Like Mechanic)
 
 **Purpose**
 - Convert matchmaking quality into meaningful introductions and real follow-up.
@@ -169,7 +224,7 @@ Status legend: `Implemented` = working in current frontend, `Partial` = mock/loc
 
 ## Locked MVP Decisions (May 2026)
 
-- **Auth mode**: Google OAuth only.
+- **Auth mode**: LinkedIn-first OAuth (OIDC) with Google fallback and manual-entry backup.
 - **Demo data strategy**: mock profile/match data is allowed for demo reliability.
 - **Wave cadence**: hybrid model (manual trigger + fixed 15-minute schedule).
 - **Primary reveal channel**: WhatsApp.
@@ -185,13 +240,18 @@ Status legend: `Implemented` = working in current frontend, `Partial` = mock/loc
 
 **Goal**: Deliver a stable end-to-end demo with controlled data and clear user value.
 
-- Add Google OAuth entry path in web onboarding.
+- Add LinkedIn OIDC entry path as default in web onboarding.
+- Add Google OAuth fallback path and manual-entry backup path.
 - Keep a demo-safe mock data path for events where live integrations are risky.
 - Finalize onboarding completion rules:
   - 3 Offer tags
   - 3 Looking For tags
   - mandatory privacy agreement
   - 24-hour deletion toggle default enabled
+- Define MVP profile-data contract:
+  - LinkedIn/Google sync: name, email, picture
+  - required manual completion: company, role, phone
+  - document post-MVP LinkedIn enrichment risk (public profile URL/richer CV fields depend on partner access)
 - Implement icebreaker questionnaire capture:
   - 13 predefined questions
   - require minimum 3 answered
@@ -202,6 +262,8 @@ Status legend: `Implemented` = working in current frontend, `Partial` = mock/loc
 
 **Exit Criteria**
 - New user can complete onboarding and reach candidate queue.
+- LinkedIn is the default auth option on QR mobile onboarding.
+- If LinkedIn auth fails, user can continue with Google; if Google fails, user can continue with manual entry.
 - Like/Pass flow works end-to-end with at least one mutual match scenario.
 - Mutual match reveals WhatsApp contact only after double opt-in.
 - Demo operator can trigger a wave on demand.

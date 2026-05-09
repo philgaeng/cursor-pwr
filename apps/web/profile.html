@@ -15,19 +15,21 @@
       </header>
       <section class="glass-card">
         <div class="step-pill">Step 2 of 6</div>
+        <p class="flow-hint">01_auth -> 02_details_gathering -> 03_icebreaker_questions -> done</p>
         <form id="profile-form" class="stack">
           <label>Full Name <input id="full-name" required placeholder="Alex Rivera" /></label>
           <label>Role <input id="role" required placeholder="Founder" /></label>
           <label>Company <input id="company" required placeholder="Nexus Labs" /></label>
+          <label>Email <input id="email" type="email" required placeholder="alex@company.com" /></label>
           <label>WhatsApp <input id="whatsapp" required placeholder="+65 9123 4567" /></label>
-          <label>
-            What I Offer (exactly 3, comma separated)
-            <input id="offer-tags" required placeholder="Fundraising, Partnerships, Hiring" />
-          </label>
-          <label>
-            What I am Looking For (exactly 3, comma separated)
-            <input id="seek-tags" required placeholder="Investors, AI Engineer, Pilot Clients" />
-          </label>
+          <div class="tag-section">
+            <p class="tag-title">What I Offer (select exactly 3)</p>
+            <div id="offer-tag-options" class="tag-options" role="group" aria-label="Offer tags"></div>
+          </div>
+          <div class="tag-section">
+            <p class="tag-title">What I am Looking For (select exactly 3)</p>
+            <div id="seek-tag-options" class="tag-options" role="group" aria-label="Seek tags"></div>
+          </div>
           <button type="submit">Save and Continue</button>
         </form>
       </section>

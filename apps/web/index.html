@@ -17,20 +17,21 @@
       <section class="glass-card">
         <div class="step-pill">Step 1 of 6</div>
         <h2>Auth Entry</h2>
-        <p class="helper">Google is default. LinkedIn works in demo mode.</p>
+        <p class="helper">LinkedIn is the default mobile sign-in. If unavailable, continue with Google or manual profile entry.</p>
+        <p class="flow-hint">01_auth -> 02_details_gathering -> 03_icebreaker_questions -> done</p>
+        <div id="qr-context" class="qr-context" hidden></div>
         <form id="auth-form" class="stack">
-          <label>
-            Sign in Provider
-            <select id="provider" required>
-              <option value="google">Google</option>
-              <option value="linkedin">LinkedIn</option>
-            </select>
-          </label>
-          <label class="checkbox-row">
-            <input id="demo-mode" type="checkbox" />
-            Enable demo mode fallback
-          </label>
-          <button type="submit">Continue to Profile</button>
+          <button type="button" id="linkedin-auth-btn">Continue with LinkedIn</button>
+          <button type="button" id="google-auth-btn" class="ghost-btn" hidden>Continue with Google</button>
+          <button type="button" id="manual-fallback-btn" class="ghost-btn" hidden>Continue with Manual Entry</button>
+        </form>
+        <form id="manual-bootstrap-form" class="stack" hidden>
+          <label>Full Name <input id="manual-name" required placeholder="Alex Rivera" /></label>
+          <label>Company <input id="manual-company" required placeholder="Nexus Labs" /></label>
+          <label>Role <input id="manual-role" required placeholder="Founder" /></label>
+          <label>Email <input id="manual-email" type="email" required placeholder="alex@company.com" /></label>
+          <label>Phone <input id="manual-phone" required placeholder="+65 9123 4567" /></label>
+          <button type="submit">Save Manual Profile and Continue</button>
         </form>
       </section>
     </main>

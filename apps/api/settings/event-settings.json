@@ -1,0 +1,92 @@
+{
+  "organizer": {
+    "creds": {
+      "email": "organizer@example.com",
+      "google": {
+        "enabled": false,
+        "clientEmail": "",
+        "privateKey": "",
+        "spreadsheetId": "",
+        "folderPath": ""
+      }
+    },
+    "socialMedia": {
+      "instagram": "",
+      "whatsapp": "",
+      "linkedin": ""
+    }
+  },
+  "eventInfo": {
+    "id": "demo-event-2026",
+    "name": "NexusLink Event",
+    "description": "",
+    "outroMessage": ""
+  },
+  "freebies": {
+    "enabled": false,
+    "links": []
+  },
+  "attendance": {
+    "expectedSize": 80,
+    "crowdDescription": ""
+  },
+  "questionRoutes": {
+    "suggestions": [
+      "food",
+      "sweets",
+      "family_life",
+      "travel",
+      "entertainment",
+      "work_style",
+      "hobbies",
+      "hot_takes"
+    ],
+    "crowdCues": ""
+  },
+  "parameters": {
+    "onboarding": {
+      "requiredOfferTags": 3,
+      "requiredSeekTags": 3,
+      "requiredIcebreakerAnswers": 3,
+      "requiredAssignedRoutesPerParticipant": 3,
+      "onboardingResumeTimeoutSeconds": 180
+    },
+    "matching": {
+      "roomSizeStrictModeThreshold": 100,
+      "strictCoverageTargetPercent": 100,
+      "relaxedCoverageTargetPercent": 92,
+      "waveIntervalMinutes": 15,
+      "waveSizeLimit": 5,
+      "targetSuggestionsPerUser": 5,
+      "diversity": {
+        "minDominantRoutes": 3,
+        "maxSuggestionsPerDominantRoute": 2
+      },
+      "repeatPolicy": {
+        "allowAcrossWaves": true,
+        "cooldownWaves": 2
+      },
+      "scoring": {
+        "weights": {
+          "tier1": 3,
+          "tier2": 2,
+          "tier3": 2,
+          "rarityBonus": 5,
+          "freeTextSemanticBonus": 5
+        },
+        "startScoringMinParticipants": 40,
+        "minMatchFloorStrategy": "distribution_floor_lowest_second_highest_score",
+        "lowConfidenceHandling": {
+          "showFewerByDefault": true,
+          "labelWhenShown": true
+        }
+      }
+    },
+    "privacy": {
+      "requireDoubleOptIn": true,
+      "primaryRevealChannel": "whatsapp",
+      "autoDeleteDefaultHoursAfterEvent": 24,
+      "requireConsentAuditTrail": true
+    }
+  }
+}

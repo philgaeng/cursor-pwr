@@ -16,10 +16,27 @@ const ICEBREAKER_QUESTIONS = [
 
 const API_BASE_URL = (window.API_BASE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
 const STORAGE_KEY = "nexuslink-web-state-v2";
+const OFFER_TAG_OPTIONS = [
+  "AI Product Strategy",
+  "Fundraising Advice",
+  "Hiring Referrals",
+  "Technical Mentorship",
+  "Growth Partnerships",
+  "Demo Feedback",
+];
+const SEEK_TAG_OPTIONS = [
+  "Investors",
+  "Co-founder Match",
+  "Pilot Customers",
+  "Engineering Talent",
+  "B2B Partnerships",
+  "Mentors",
+];
 
 const defaultState = {
   auth: null,
   userId: null,
+  eventId: null,
   profile: null,
   answers: [],
   consent: null,
@@ -27,12 +44,6 @@ const defaultState = {
   wave: null,
   actions: [],
 };
-
-const parseTags = (raw) =>
-  raw
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean);
 
 const loadState = () => {
   try {
@@ -181,46 +192,226 @@ const renderVault = () => {
 };
 
 const bindAuthPage = () => {
-  const form = document.getElementById("auth-form");
-  if (!form) return;
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const provider = document.getElementById("provider").value;
-    const demoMode = document.getElementById("demo-mode").checked;
-    if (provider !== "google" && !demoMode) {
-      setStatus("LinkedIn requires demo mode in MVP.", "error");
-      return;
+  const linkedInButton = document.getElementById("linkedin-auth-btn");
+  const googleButton = document.getElementById("google-auth-btn");
+  const manualButton = document.getElementById("manual-fallback-btn");
+  const manualForm = document.getElementById("manual-bootstrap-form");
+  const qrContext = document.getElementById("qr-context");
+  if (!linkedInButton || !googleButton || !manualButton || !manualForm) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const eventId = params.get("eventId");
+  if (eventId) {
+    state.eventId = eventId;
+    saveState(state);
+    if (qrContext) {
+      qrContext.hidden = false;
+      qrContext.textContent = `Event QR detected (${eventId}). LinkedIn is prioritized for fastest onboarding.`;
     }
+  }
+
+  const showGoogleFallback = (message) => {
+    googleButton.hidden = false;
+    manualButton.hidden = true;
+    manualForm.hidden = true;
+    setStatus(message, "error");
+  };
+
+  const showManualFallback = (message) => {
+    googleButton.hidden = false;
+    manualButton.hidden = false;
+    setStatus(message, "error");
+  };
+
+  const continueToDetailsGathering = () => {
+    navigate("./profile.html?step=02_details_gathering");
+  };
+
+  const saveBootstrap = (provider, session) => {
+    state.auth = { provider, demoMode: Boolean(session.demoMode) };
+    state.userId = session.userId;
+    state.profile = {
+      ...(state.profile || {}),
+      fullName: session.profile?.name || state.profile?.fullName || "",
+      name: session.profile?.name || state.profile?.name || "",
+      email: session.profile?.email || state.profile?.email || "",
+      avatarUrl: session.profile?.picture || state.profile?.avatarUrl || "",
+      role: state.profile?.role || "",
+      company: state.profile?.company || "",
+      whatsapp: state.profile?.whatsapp || "",
+      offers: Array.isArray(state.profile?.offers) ? state.profile.offers : [],
+      seeks: Array.isArray(state.profile?.seeks) ? state.profile.seeks : [],
+    };
+    saveState(state);
+  };
+
+  const authenticateProvider = async (provider) => {
     try {
-      const session = await apiFetch("/api/auth/session", { method: "POST", body: JSON.stringify({ provider, demoMode }) });
-      state.auth = { provider, demoMode };
-      state.userId = session.userId;
-      saveState(state);
-      setStatus("Auth complete.", "success");
-      navigate("./profile.html");
+      const session = await apiFetch("/api/auth/session", {
+        method: "POST",
+        body: JSON.stringify({ provider, eventId: state.eventId || undefined }),
+      });
+      saveBootstrap(provider, session);
+      setStatus(`Signed in with ${provider}.`, "success");
+      continueToDetailsGathering();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Auth failed.", "error");
+      const reason = error instanceof Error ? error.message : `${provider} sign-in failed.`;
+      if (provider === "linkedin") {
+        showGoogleFallback(`${reason} Continue with Google.`);
+      } else {
+        showManualFallback(`${reason} Continue with manual entry.`);
+      }
+    }
+  };
+
+  linkedInButton.addEventListener("click", () => {
+    authenticateProvider("linkedin");
+  });
+  googleButton.addEventListener("click", () => {
+    authenticateProvider("google");
+  });
+  manualButton.addEventListener("click", () => {
+    manualForm.hidden = false;
+    setStatus("Complete manual bootstrap to continue.", "info");
+  });
+
+  manualForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = {
+      name: document.getElementById("manual-name").value.trim(),
+      company: document.getElementById("manual-company").value.trim(),
+      role: document.getElementById("manual-role").value.trim(),
+      email: document.getElementById("manual-email").value.trim(),
+      phone: document.getElementById("manual-phone").value.trim(),
+      eventId: state.eventId || undefined,
+    };
+    try {
+      const result = await apiFetch("/api/auth/manual-bootstrap", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      state.auth = { provider: "manual", demoMode: true };
+      state.userId = result.userId;
+      state.profile = {
+        ...(state.profile || {}),
+        fullName: result.profile.name,
+        name: result.profile.name,
+        role: result.profile.role,
+        company: result.profile.company,
+        email: result.profile.email,
+        whatsapp: result.profile.phone,
+        offers: Array.isArray(state.profile?.offers) ? state.profile.offers : [],
+        seeks: Array.isArray(state.profile?.seeks) ? state.profile.seeks : [],
+      };
+      saveState(state);
+      setStatus("Manual profile saved.", "success");
+      continueToDetailsGathering();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Manual bootstrap failed.", "error");
     }
   });
 };
 
 const bindProfilePage = () => {
   const form = document.getElementById("profile-form");
+  const offerContainer = document.getElementById("offer-tag-options");
+  const seekContainer = document.getElementById("seek-tag-options");
   if (!form) return;
+
+  let selectedOffers = [];
+  let selectedSeeks = [];
+
+  const createTagButton = (tag, type) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "tag-chip";
+    button.dataset.tag = tag;
+    button.dataset.type = type;
+    button.textContent = tag;
+    return button;
+  };
+
+  const renderTagSelection = () => {
+    if (offerContainer) {
+      offerContainer.querySelectorAll(".tag-chip").forEach((button) => {
+        button.classList.toggle("selected", selectedOffers.includes(button.dataset.tag));
+      });
+    }
+    if (seekContainer) {
+      seekContainer.querySelectorAll(".tag-chip").forEach((button) => {
+        button.classList.toggle("selected", selectedSeeks.includes(button.dataset.tag));
+      });
+    }
+  };
+
+  const toggleTag = (tag, selectedList) => {
+    if (selectedList.includes(tag)) {
+      return selectedList.filter((entry) => entry !== tag);
+    }
+    if (selectedList.length >= 3) {
+      setStatus("Select exactly 3 tags per section.", "error");
+      return selectedList;
+    }
+    return [...selectedList, tag];
+  };
+
+  if (offerContainer) {
+    OFFER_TAG_OPTIONS.forEach((tag) => {
+      offerContainer.appendChild(createTagButton(tag, "offer"));
+    });
+    offerContainer.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLButtonElement)) return;
+      selectedOffers = toggleTag(target.dataset.tag, selectedOffers);
+      renderTagSelection();
+      if (selectedOffers.length <= 3 && selectedSeeks.length <= 3) {
+        setStatus(
+          `Offer ${selectedOffers.length}/3 • Looking for ${selectedSeeks.length}/3`,
+          "info"
+        );
+      }
+    });
+  }
+
+  if (seekContainer) {
+    SEEK_TAG_OPTIONS.forEach((tag) => {
+      seekContainer.appendChild(createTagButton(tag, "seek"));
+    });
+    seekContainer.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLButtonElement)) return;
+      selectedSeeks = toggleTag(target.dataset.tag, selectedSeeks);
+      renderTagSelection();
+      if (selectedOffers.length <= 3 && selectedSeeks.length <= 3) {
+        setStatus(
+          `Offer ${selectedOffers.length}/3 • Looking for ${selectedSeeks.length}/3`,
+          "info"
+        );
+      }
+    });
+  }
+
   if (state.profile) {
     document.getElementById("full-name").value = state.profile.fullName || "";
     document.getElementById("role").value = state.profile.role || "";
     document.getElementById("company").value = state.profile.company || "";
+    document.getElementById("email").value = state.profile.email || "";
     document.getElementById("whatsapp").value = state.profile.whatsapp || "";
-    document.getElementById("offer-tags").value = (state.profile.offers || []).join(", ");
-    document.getElementById("seek-tags").value = (state.profile.seeks || []).join(", ");
+    selectedOffers = Array.isArray(state.profile.offers) ? state.profile.offers.slice(0, 3) : [];
+    selectedSeeks = Array.isArray(state.profile.seeks) ? state.profile.seeks.slice(0, 3) : [];
+    renderTagSelection();
   }
+
+  if (selectedOffers.length === 0 && selectedSeeks.length === 0) {
+    setStatus("Select 3 offer tags and 3 looking-for tags.", "info");
+  } else {
+    setStatus(`Offer ${selectedOffers.length}/3 • Looking for ${selectedSeeks.length}/3`, "info");
+  }
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const offers = parseTags(document.getElementById("offer-tags").value);
-    const seeks = parseTags(document.getElementById("seek-tags").value);
-    if (offers.length !== 3 || seeks.length !== 3) {
-      setStatus("Enter exactly 3 offer and 3 seek tags.", "error");
+    if (selectedOffers.length !== 3 || selectedSeeks.length !== 3) {
+      setStatus("Select exactly 3 offer tags and 3 looking-for tags.", "error");
       return;
     }
     const profile = {
@@ -229,9 +420,10 @@ const bindProfilePage = () => {
       name: document.getElementById("full-name").value.trim(),
       role: document.getElementById("role").value.trim(),
       company: document.getElementById("company").value.trim(),
+      email: document.getElementById("email").value.trim(),
       whatsapp: document.getElementById("whatsapp").value.trim(),
-      offers,
-      seeks,
+      offers: selectedOffers,
+      seeks: selectedSeeks,
     };
     try {
       await apiFetch("/api/onboarding/profile", { method: "POST", body: JSON.stringify(profile) });
@@ -292,6 +484,7 @@ const bindConsentPage = () => {
           name: state.profile.fullName,
           role: state.profile.role,
           company: state.profile.company,
+          email: state.profile.email,
           whatsapp: state.profile.whatsapp,
           answers: state.answers,
         }),
