@@ -362,13 +362,36 @@ const createWave = (eventId) => ({
   candidates: buildMockCandidates(),
 });
 
-module.exports = (req, res) => {
+const resolveHandlerPath = (req) => {
+  const rawUrl = typeof req.url === "string" ? req.url : "";
+  const pathname = rawUrl.split("?")[0] || "/";
+
+  if (pathname.startsWith("/api/")) {
+    const rest = pathname.slice("/api".length);
+    return rest.length ? (rest.startsWith("/") ? rest : `/${rest}`) : "/";
+  }
+  if (pathname === "/api") {
+    return "/";
+  }
+
   const routeParts = Array.isArray(req.query.route)
     ? req.query.route
     : req.query.route
       ? [req.query.route]
       : [];
-  const path = `/${routeParts.join("/")}`;
+  if (routeParts.length) {
+    const joined = routeParts.join("/");
+    return joined.startsWith("/") ? joined : `/${joined}`;
+  }
+
+  if (pathname.startsWith("/")) {
+    return pathname;
+  }
+  return `/${pathname}`;
+};
+
+module.exports = (req, res) => {
+  const path = resolveHandlerPath(req);
   const body = getBody(req);
 
   try {
