@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NexusLink - Organizer setup</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-page="organizer">
+    <main class="mobile-shell organizer-shell">
+      <header class="app-header">
+        <p class="eyebrow">NexusLink</p>
+        <h1>Event setup</h1>
+        <p class="subtitle">Configure thresholds, crowd cues, and organizer details. Saves to the API as structured JSON.</p>
+        <p class="flow-hint">Event ID: <strong id="org-event-id">—</strong></p>
+      </header>
+
+      <section class="glass-card">
+        <div class="organizer-toolbar">
+          <a class="link-btn ghost-btn" href="./index.html">Back to attendee flow</a>
+          <button type="button" id="organizer-reload" class="ghost-btn">Reload from server</button>
+        </div>
+
+        <form id="organizer-form" class="stack organizer-form">
+          <fieldset class="organizer-fieldset">
+            <legend>Organizer</legend>
+            <label>Organizer email (attendance / exports) <input id="org-email" type="email" required placeholder="you@company.com" /></label>
+            <label class="checkbox-row organizer-checkbox"
+              ><input id="org-google-enabled" type="checkbox" /> Enable Google Sheets export fields</label
+            >
+            <label>Google service account email <input id="org-google-client-email" type="text" autocomplete="off" placeholder="svc@project.iam.gserviceaccount.com" /></label>
+            <label>Private key (paste PEM; keep server-side only in production) <textarea id="org-google-private-key" rows="3" placeholder="-----BEGIN PRIVATE KEY-----"></textarea></label>
+            <label>Spreadsheet ID <input id="org-google-spreadsheet-id" type="text" autocomplete="off" /></label>
+            <label>Drive folder path or ID <input id="org-google-folder-path" type="text" autocomplete="off" placeholder="folder id or path" /></label>
+            <label>Instagram <input id="org-social-ig" type="text" placeholder="URL or handle" /></label>
+            <label>WhatsApp <input id="org-social-wa" type="text" placeholder="Link or number" /></label>
+            <label>LinkedIn <input id="org-social-li" type="text" placeholder="Profile URL" /></label>
+          </fieldset>
+
+          <fieldset class="organizer-fieldset">
+            <legend>Event info</legend>
+            <label>Event name <input id="org-event-name" type="text" required placeholder="Founder mixer" /></label>
+            <label>Description <textarea id="org-event-desc" rows="3" placeholder="What attendees should know"></textarea></label>
+            <label>Outro message <textarea id="org-event-outro" rows="2" placeholder="Shown after intake"></textarea></label>
+          </fieldset>
+
+          <fieldset class="organizer-fieldset">
+            <legend>Freebies</legend>
+            <label class="checkbox-row organizer-checkbox"><input id="org-freebies-enabled" type="checkbox" /> Show freebie links after intake</label>
+            <label>Links (one URL per line) <textarea id="org-freebies-links" rows="3" placeholder="https://…"></textarea></label>
+          </fieldset>
+
+          <fieldset class="organizer-fieldset">
+            <legend>Attendance</legend>
+            <label>Expected size <input id="org-attendance-size" type="number" min="1" step="1" required /></label>
+            <label>Crowd description <textarea id="org-attendance-desc" rows="2" placeholder="Who is in the room?"></textarea></label>
+          </fieldset>
+
+          <fieldset class="organizer-fieldset">
+            <legend>Question routes (8 suggestions)</legend>
+            <p class="helper organizer-fieldset-hint">Free-text labels or route ids; must stay 8 entries for validation.</p>
+            <div class="organizer-route-grid">
+              <label>Route 1 <input id="org-route-0" type="text" required /></label>
+              <label>Route 2 <input id="org-route-1" type="text" required /></label>
+              <label>Route 3 <input id="org-route-2" type="text" required /></label>
+              <label>Route 4 <input id="org-route-3" type="text" required /></label>
+              <label>Route 5 <input id="org-route-4" type="text" required /></label>
+              <label>Route 6 <input id="org-route-5" type="text" required /></label>
+              <label>Route 7 <input id="org-route-6" type="text" required /></label>
+              <label>Route 8 <input id="org-route-7" type="text" required /></label>
+            </div>
+            <label>Crowd cues (for agents / auto routes) <textarea id="org-crowd-cues" rows="3" placeholder="Themes, tone, off-limits"></textarea></label>
+          </fieldset>
+
+          <fieldset class="organizer-fieldset">
+            <legend>Onboarding parameters</legend>
+            <div class="organizer-num-grid">
+              <label>Required offer tags <input id="org-req-offers" type="number" min="1" step="1" /></label>
+              <label>Required seek tags <input id="org-req-seeks" type="number" min="1" step="1" /></label>
+              <label>Required icebreaker answers <input id="org-req-icebreaker" type="number" min="1" step="1" /></label>
+              <label>Assigned routes per participant <input id="org-req-routes" type="number" min="1" step="1" /></label>
+              <label>Resume timeout (seconds) <input id="org-resume-timeout" type="number" min="30" step="1" /></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="organizer-fieldset">
+            <legend>Matching (spec 04)</legend>
+            <div class="organizer-num-grid">
+              <label>Room strict-mode threshold (participants) <input id="org-room-threshold" type="number" min="1" step="1" /></label>
+              <label>Strict coverage % <input id="org-strict-coverage" type="number" min="1" max="100" step="1" /></label>
+              <label>Relaxed coverage % <input id="org-relaxed-coverage" type="number" min="1" max="100" step="1" /></label>
+              <label>Wave interval (minutes) <input id="org-wave-interval" type="number" min="1" step="1" required /></label>
+              <label>Wave size cap <input id="org-wave-size" type="number" min="1" step="1" required /></label>
+              <label>Target suggestions / user <input id="org-target-suggestions" type="number" min="1" step="1" /></label>
+              <label>Min dominant routes <input id="org-diversity-min" type="number" min="1" step="1" /></label>
+              <label>Max per dominant route <input id="org-diversity-max" type="number" min="1" step="1" /></label>
+              <label>Repeat cooldown (waves) <input id="org-repeat-cooldown" type="number" min="0" step="1" /></label>
+            </div>
+            <label class="checkbox-row organizer-checkbox"><input id="org-repeat-allow" type="checkbox" /> Allow repeats across waves</label>
+
+            <p class="helper organizer-sublegend">Scoring weights</p>
+            <div class="organizer-num-grid">
+              <label>Tier 1 weight <input id="org-weight-t1" type="number" step="1" /></label>
+              <label>Tier 2 weight <input id="org-weight-t2" type="number" step="1" /></label>
+              <label>Tier 3 weight <input id="org-weight-t3" type="number" step="1" /></label>
+              <label>Rarity bonus <input id="org-weight-rarity" type="number" step="1" /></label>
+              <label>Free-text bonus <input id="org-weight-freetext" type="number" step="1" /></label>
+              <label>Start scoring min participants <input id="org-start-scoring-min" type="number" min="1" step="1" /></label>
+            </div>
+            <label>Min match floor strategy <input id="org-floor-strategy" type="text" /></label>
+            <label class="checkbox-row organizer-checkbox"><input id="org-lowconf-fewer" type="checkbox" /> Prefer fewer matches over low confidence</label>
+            <label class="checkbox-row organizer-checkbox"><input id="org-lowconf-label" type="checkbox" /> Label low-confidence matches in UI</label>
+          </fieldset>
+
+          <fieldset class="organizer-fieldset">
+            <legend>Privacy defaults</legend>
+            <label class="checkbox-row organizer-checkbox"><input id="org-privacy-double" type="checkbox" /> Require double opt-in</label>
+            <label
+              >Primary reveal channel
+              <select id="org-privacy-reveal">
+                <option value="whatsapp">WhatsApp</option>
+                <option value="email">Email</option>
+              </select>
+            </label>
+            <label>Default auto-delete (hours after event) <input id="org-privacy-delete-hours" type="number" min="1" step="1" /></label>
+            <label class="checkbox-row organizer-checkbox"><input id="org-privacy-audit" type="checkbox" /> Require consent audit trail</label>
+          </fieldset>
+
+          <button type="submit">Save event settings</button>
+        </form>
+      </section>
+    </main>
+
+    <footer class="status-bar">
+      <span id="app-status">Loading organizer settings…</span>
+    </footer>
+    <script src="./main.js" type="module"></script>
+  </body>
+</html>

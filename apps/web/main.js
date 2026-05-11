@@ -73,6 +73,7 @@ const shuffle = (items) => {
 };
 
 const ensureStep = () => {
+  if (page === "organizer") return;
   if (page !== "auth" && !state.auth) navigate("./index.html");
   if (["questions", "consent", "queue", "vault"].includes(page) && !state.profile) navigate("./profile.html");
   if (["consent", "queue", "vault"].includes(page) && state.icebreakerResponses.length < 3) navigate("./questions.html");
@@ -673,6 +674,360 @@ const bindVaultPage = () => {
   renderVault();
 };
 
+const defaultOrganizerSettingsShape = () => ({
+  organizer: {
+    creds: {
+      email: "",
+      google: {
+        enabled: false,
+        clientEmail: "",
+        privateKey: "",
+        spreadsheetId: "",
+        folderPath: "",
+      },
+    },
+    socialMedia: {
+      instagram: "",
+      whatsapp: "",
+      linkedin: "",
+    },
+  },
+  eventInfo: {
+    id: "demo-event-2026",
+    name: "",
+    description: "",
+    outroMessage: "",
+  },
+  freebies: {
+    enabled: false,
+    links: [],
+  },
+  attendance: {
+    expectedSize: 80,
+    crowdDescription: "",
+  },
+  questionRoutes: {
+    suggestions: ["", "", "", "", "", "", "", ""],
+    crowdCues: "",
+  },
+  parameters: {
+    onboarding: {
+      requiredOfferTags: 3,
+      requiredSeekTags: 3,
+      requiredIcebreakerAnswers: 3,
+      requiredAssignedRoutesPerParticipant: 3,
+      onboardingResumeTimeoutSeconds: 180,
+    },
+    matching: {
+      roomSizeStrictModeThreshold: 100,
+      strictCoverageTargetPercent: 100,
+      relaxedCoverageTargetPercent: 92,
+      waveIntervalMinutes: 15,
+      waveSizeLimit: 5,
+      targetSuggestionsPerUser: 5,
+      diversity: {
+        minDominantRoutes: 3,
+        maxSuggestionsPerDominantRoute: 2,
+      },
+      repeatPolicy: {
+        allowAcrossWaves: true,
+        cooldownWaves: 2,
+      },
+      scoring: {
+        weights: {
+          tier1: 3,
+          tier2: 2,
+          tier3: 2,
+          rarityBonus: 5,
+          freeTextSemanticBonus: 5,
+        },
+        startScoringMinParticipants: 40,
+        minMatchFloorStrategy: "distribution_floor_lowest_second_highest_score",
+        lowConfidenceHandling: {
+          showFewerByDefault: true,
+          labelWhenShown: true,
+        },
+      },
+    },
+    privacy: {
+      requireDoubleOptIn: true,
+      primaryRevealChannel: "whatsapp",
+      autoDeleteDefaultHoursAfterEvent: 24,
+      requireConsentAuditTrail: true,
+    },
+  },
+});
+
+const deepMerge = (target, source) => {
+  if (!source || typeof source !== "object") return target;
+  if (Array.isArray(source)) return source.slice();
+  const out = Array.isArray(target) ? [...target] : { ...target };
+  Object.keys(source).forEach((key) => {
+    const sv = source[key];
+    const tv = target[key];
+    if (
+      sv &&
+      typeof sv === "object" &&
+      !Array.isArray(sv) &&
+      tv &&
+      typeof tv === "object" &&
+      !Array.isArray(tv)
+    ) {
+      out[key] = deepMerge(tv, sv);
+    } else {
+      out[key] = sv;
+    }
+  });
+  return out;
+};
+
+const bindOrganizerPage = () => {
+  const form = document.getElementById("organizer-form");
+  const reloadBtn = document.getElementById("organizer-reload");
+  if (!form) return;
+
+  const getEl = (id) => document.getElementById(id);
+
+  const applyToForm = (raw) => {
+    const s = deepMerge(defaultOrganizerSettingsShape(), raw || {});
+    const eventIdEl = getEl("org-event-id");
+    if (eventIdEl) eventIdEl.textContent = s.eventInfo?.id || "—";
+
+    getEl("org-email").value = s.organizer?.creds?.email || "";
+    getEl("org-google-enabled").checked = Boolean(s.organizer?.creds?.google?.enabled);
+    getEl("org-google-client-email").value = s.organizer?.creds?.google?.clientEmail || "";
+    getEl("org-google-private-key").value = s.organizer?.creds?.google?.privateKey || "";
+    getEl("org-google-spreadsheet-id").value = s.organizer?.creds?.google?.spreadsheetId || "";
+    getEl("org-google-folder-path").value = s.organizer?.creds?.google?.folderPath || "";
+
+    getEl("org-social-ig").value = s.organizer?.socialMedia?.instagram || "";
+    getEl("org-social-wa").value = s.organizer?.socialMedia?.whatsapp || "";
+    getEl("org-social-li").value = s.organizer?.socialMedia?.linkedin || "";
+
+    getEl("org-event-name").value = s.eventInfo?.name || "";
+    getEl("org-event-desc").value = s.eventInfo?.description || "";
+    getEl("org-event-outro").value = s.eventInfo?.outroMessage || "";
+
+    getEl("org-freebies-enabled").checked = Boolean(s.freebies?.enabled);
+    const links = Array.isArray(s.freebies?.links) ? s.freebies.links : [];
+    getEl("org-freebies-links").value = links.join("\n");
+
+    getEl("org-attendance-size").value = String(s.attendance?.expectedSize ?? 80);
+    getEl("org-attendance-desc").value = s.attendance?.crowdDescription || "";
+
+    const suggestions = Array.isArray(s.questionRoutes?.suggestions) ? s.questionRoutes.suggestions : [];
+    for (let i = 0; i < 8; i += 1) {
+      const input = getEl(`org-route-${i}`);
+      if (input) input.value = suggestions[i] || "";
+    }
+    getEl("org-crowd-cues").value = s.questionRoutes?.crowdCues || "";
+
+    const onb = s.parameters?.onboarding || {};
+    getEl("org-req-offers").value = String(onb.requiredOfferTags ?? 3);
+    getEl("org-req-seeks").value = String(onb.requiredSeekTags ?? 3);
+    getEl("org-req-icebreaker").value = String(onb.requiredIcebreakerAnswers ?? 3);
+    getEl("org-req-routes").value = String(onb.requiredAssignedRoutesPerParticipant ?? 3);
+    getEl("org-resume-timeout").value = String(onb.onboardingResumeTimeoutSeconds ?? 180);
+
+    const m = s.parameters?.matching || {};
+    getEl("org-room-threshold").value = String(m.roomSizeStrictModeThreshold ?? 100);
+    getEl("org-strict-coverage").value = String(m.strictCoverageTargetPercent ?? 100);
+    getEl("org-relaxed-coverage").value = String(m.relaxedCoverageTargetPercent ?? 92);
+    getEl("org-wave-interval").value = String(m.waveIntervalMinutes ?? 15);
+    getEl("org-wave-size").value = String(m.waveSizeLimit ?? 5);
+    getEl("org-target-suggestions").value = String(m.targetSuggestionsPerUser ?? 5);
+    getEl("org-diversity-min").value = String(m.diversity?.minDominantRoutes ?? 3);
+    getEl("org-diversity-max").value = String(m.diversity?.maxSuggestionsPerDominantRoute ?? 2);
+    getEl("org-repeat-allow").checked = m.repeatPolicy?.allowAcrossWaves !== false;
+    getEl("org-repeat-cooldown").value = String(m.repeatPolicy?.cooldownWaves ?? 2);
+
+    const w = m.scoring?.weights || {};
+    getEl("org-weight-t1").value = String(w.tier1 ?? 3);
+    getEl("org-weight-t2").value = String(w.tier2 ?? 2);
+    getEl("org-weight-t3").value = String(w.tier3 ?? 2);
+    getEl("org-weight-rarity").value = String(w.rarityBonus ?? 5);
+    getEl("org-weight-freetext").value = String(w.freeTextSemanticBonus ?? 5);
+    getEl("org-start-scoring-min").value = String(m.scoring?.startScoringMinParticipants ?? 40);
+    getEl("org-floor-strategy").value = m.scoring?.minMatchFloorStrategy || "";
+    getEl("org-lowconf-fewer").checked = m.scoring?.lowConfidenceHandling?.showFewerByDefault !== false;
+    getEl("org-lowconf-label").checked = m.scoring?.lowConfidenceHandling?.labelWhenShown !== false;
+
+    const p = s.parameters?.privacy || {};
+    getEl("org-privacy-double").checked = p.requireDoubleOptIn !== false;
+    getEl("org-privacy-reveal").value = p.primaryRevealChannel || "whatsapp";
+    getEl("org-privacy-delete-hours").value = String(p.autoDeleteDefaultHoursAfterEvent ?? 24);
+    getEl("org-privacy-audit").checked = p.requireConsentAuditTrail !== false;
+  };
+
+  const readInt = (id, fallback) => {
+    const v = parseInt(getEl(id).value, 10);
+    return Number.isFinite(v) ? v : fallback;
+  };
+
+  const collectFromForm = (previous) => {
+    const base = deepMerge(defaultOrganizerSettingsShape(), previous || {});
+    const freebieLines = getEl("org-freebies-links")
+      .value.split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    const suggestions = [];
+    for (let i = 0; i < 8; i += 1) {
+      suggestions.push((getEl(`org-route-${i}`).value || "").trim());
+    }
+
+    return {
+      organizer: {
+        creds: {
+          email: getEl("org-email").value.trim(),
+          google: {
+            enabled: getEl("org-google-enabled").checked,
+            clientEmail: getEl("org-google-client-email").value.trim(),
+            privateKey: getEl("org-google-private-key").value,
+            spreadsheetId: getEl("org-google-spreadsheet-id").value.trim(),
+            folderPath: getEl("org-google-folder-path").value.trim(),
+          },
+        },
+        socialMedia: {
+          instagram: getEl("org-social-ig").value.trim(),
+          whatsapp: getEl("org-social-wa").value.trim(),
+          linkedin: getEl("org-social-li").value.trim(),
+        },
+      },
+      eventInfo: {
+        ...base.eventInfo,
+        name: getEl("org-event-name").value.trim(),
+        description: getEl("org-event-desc").value,
+        outroMessage: getEl("org-event-outro").value,
+      },
+      freebies: {
+        enabled: getEl("org-freebies-enabled").checked,
+        links: freebieLines,
+      },
+      attendance: {
+        expectedSize: readInt("org-attendance-size", base.attendance.expectedSize),
+        crowdDescription: getEl("org-attendance-desc").value,
+      },
+      questionRoutes: {
+        suggestions,
+        crowdCues: getEl("org-crowd-cues").value,
+      },
+      parameters: {
+        onboarding: {
+          requiredOfferTags: readInt("org-req-offers", base.parameters.onboarding.requiredOfferTags),
+          requiredSeekTags: readInt("org-req-seeks", base.parameters.onboarding.requiredSeekTags),
+          requiredIcebreakerAnswers: readInt(
+            "org-req-icebreaker",
+            base.parameters.onboarding.requiredIcebreakerAnswers
+          ),
+          requiredAssignedRoutesPerParticipant: readInt(
+            "org-req-routes",
+            base.parameters.onboarding.requiredAssignedRoutesPerParticipant
+          ),
+          onboardingResumeTimeoutSeconds: readInt(
+            "org-resume-timeout",
+            base.parameters.onboarding.onboardingResumeTimeoutSeconds
+          ),
+        },
+        matching: {
+          roomSizeStrictModeThreshold: readInt(
+            "org-room-threshold",
+            base.parameters.matching.roomSizeStrictModeThreshold
+          ),
+          strictCoverageTargetPercent: readInt(
+            "org-strict-coverage",
+            base.parameters.matching.strictCoverageTargetPercent
+          ),
+          relaxedCoverageTargetPercent: readInt(
+            "org-relaxed-coverage",
+            base.parameters.matching.relaxedCoverageTargetPercent
+          ),
+          waveIntervalMinutes: readInt("org-wave-interval", base.parameters.matching.waveIntervalMinutes),
+          waveSizeLimit: readInt("org-wave-size", base.parameters.matching.waveSizeLimit),
+          targetSuggestionsPerUser: readInt(
+            "org-target-suggestions",
+            base.parameters.matching.targetSuggestionsPerUser
+          ),
+          diversity: {
+            minDominantRoutes: readInt("org-diversity-min", base.parameters.matching.diversity.minDominantRoutes),
+            maxSuggestionsPerDominantRoute: readInt(
+              "org-diversity-max",
+              base.parameters.matching.diversity.maxSuggestionsPerDominantRoute
+            ),
+          },
+          repeatPolicy: {
+            allowAcrossWaves: getEl("org-repeat-allow").checked,
+            cooldownWaves: readInt("org-repeat-cooldown", base.parameters.matching.repeatPolicy.cooldownWaves),
+          },
+          scoring: {
+            weights: {
+              tier1: readInt("org-weight-t1", base.parameters.matching.scoring.weights.tier1),
+              tier2: readInt("org-weight-t2", base.parameters.matching.scoring.weights.tier2),
+              tier3: readInt("org-weight-t3", base.parameters.matching.scoring.weights.tier3),
+              rarityBonus: readInt("org-weight-rarity", base.parameters.matching.scoring.weights.rarityBonus),
+              freeTextSemanticBonus: readInt(
+                "org-weight-freetext",
+                base.parameters.matching.scoring.weights.freeTextSemanticBonus
+              ),
+            },
+            startScoringMinParticipants: readInt(
+              "org-start-scoring-min",
+              base.parameters.matching.scoring.startScoringMinParticipants
+            ),
+            minMatchFloorStrategy: getEl("org-floor-strategy").value.trim(),
+            lowConfidenceHandling: {
+              showFewerByDefault: getEl("org-lowconf-fewer").checked,
+              labelWhenShown: getEl("org-lowconf-label").checked,
+            },
+          },
+        },
+        privacy: {
+          requireDoubleOptIn: getEl("org-privacy-double").checked,
+          primaryRevealChannel: getEl("org-privacy-reveal").value,
+          autoDeleteDefaultHoursAfterEvent: readInt(
+            "org-privacy-delete-hours",
+            base.parameters.privacy.autoDeleteDefaultHoursAfterEvent
+          ),
+          requireConsentAuditTrail: getEl("org-privacy-audit").checked,
+        },
+      },
+    };
+  };
+
+  let lastLoaded = null;
+
+  const load = async () => {
+    try {
+      const payload = await apiFetch("/api/organizer/settings", { method: "GET" });
+      lastLoaded = payload.settings;
+      applyToForm(lastLoaded);
+      setStatus("Settings loaded.", "success");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Failed to load settings.", "error");
+    }
+  };
+
+  if (reloadBtn) reloadBtn.addEventListener("click", () => load());
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const settings = collectFromForm(lastLoaded || defaultOrganizerSettingsShape());
+    try {
+      const result = await apiFetch("/api/organizer/settings", {
+        method: "POST",
+        body: JSON.stringify({ settings }),
+      });
+      lastLoaded = result.settings;
+      applyToForm(lastLoaded);
+      setStatus("Event settings saved.", "success");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Save failed.", "error");
+    }
+  });
+
+  load();
+};
+
 ensureStep();
 if (page === "auth") bindAuthPage();
 if (page === "profile") bindProfilePage();
@@ -680,3 +1035,4 @@ if (page === "questions") bindQuestionsPage();
 if (page === "consent") bindConsentPage();
 if (page === "queue") bindQueuePage();
 if (page === "vault") bindVaultPage();
+if (page === "organizer") bindOrganizerPage();
