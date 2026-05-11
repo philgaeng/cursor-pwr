@@ -5,6 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NexusLink - Icebreakers</title>
     <link rel="stylesheet" href="/styles.css" />
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("nexuslink-web-state-v2");
+          var s = raw ? JSON.parse(raw) : {};
+          if (!s || !s.auth) {
+            window.location.replace("/index.html");
+            return;
+          }
+          if (!s.profile) {
+            window.location.replace("/profile.html");
+            return;
+          }
+        } catch (_e) {
+          window.location.replace("/index.html");
+        }
+      })();
+    </script>
   </head>
   <body data-page="questions">
     <main class="mobile-shell">

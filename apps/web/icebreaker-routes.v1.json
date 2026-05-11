@@ -1,0 +1,623 @@
+{
+  "version": "v1",
+  "language": "en",
+  "routesPerParticipant": 3,
+  "freeTextDefault": {
+    "enabled": true,
+    "label": "Optional: share one specific example"
+  },
+  "routes": [
+    {
+      "routeId": "food",
+      "title": "Food",
+      "tier1Prompt": "What cuisine do you enjoy most?",
+      "tier1Options": [
+        {
+          "code": "filipino_classics",
+          "label": "Filipino classics",
+          "tier2Prompt": "Pick your lane:",
+          "tier2Options": ["ulam_rice", "street_food"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "ulam_rice": [
+              { "prompt": "Choose one:", "options": ["adobo", "sinigang"] },
+              { "prompt": "How spicy?", "options": ["mild", "maanghang"] }
+            ],
+            "street_food": [
+              { "prompt": "Top pick:", "options": ["isaw", "kwek_kwek"] },
+              { "prompt": "Best time to eat?", "options": ["after_work", "late_night"] }
+            ]
+          },
+          "freeTextPromptOverride": "Optional: your go-to Filipino food spot"
+        },
+        {
+          "code": "italian",
+          "label": "Italian",
+          "tier2Prompt": "Pick one:",
+          "tier2Options": ["pizza", "pasta"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "pizza": [
+              { "prompt": "Pizza pick?", "options": ["margherita", "pepperoni"] },
+              { "prompt": "Cheese pick?", "options": ["gorgonzola", "mozza"] }
+            ],
+            "pasta": [
+              { "prompt": "Pasta shape?", "options": ["spaghetti", "ravioli"] },
+              { "prompt": "Extra parmesan?", "options": ["yes", "no"] }
+            ]
+          },
+          "freeTextPromptOverride": "Optional: favorite Italian dessert"
+        },
+        {
+          "code": "japanese",
+          "label": "Japanese",
+          "tier2Prompt": "Choose one:",
+          "tier2Options": ["ramen", "sushi"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "ramen": [
+              { "prompt": "Broth style?", "options": ["tonkotsu", "shoyu"] },
+              { "prompt": "Add-ons?", "options": ["egg", "extra_chashu"] }
+            ],
+            "sushi": [
+              { "prompt": "Type?", "options": ["nigiri", "maki"] },
+              { "prompt": "Flavor profile?", "options": ["fresh_light", "creamy_rich"] }
+            ]
+          },
+          "freeTextPromptOverride": "Optional: favorite Japanese place in town"
+        },
+        {
+          "code": "burgers",
+          "label": "Burgers",
+          "tier2Prompt": "Style?",
+          "tier2Options": ["smash", "thick_patty"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "smash": [
+              { "prompt": "Cheese level?", "options": ["single", "double"] },
+              { "prompt": "Sauce vibe?", "options": ["classic", "spicy"] }
+            ],
+            "thick_patty": [
+              { "prompt": "Meat preference?", "options": ["beef", "chicken"] },
+              { "prompt": "Best side?", "options": ["fries", "onion_rings"] }
+            ]
+          },
+          "freeTextPromptOverride": "Optional: best burger recommendation"
+        }
+      ],
+      "freeTextPrompt": "Optional: favorite meal in this category"
+    },
+    {
+      "routeId": "sweets",
+      "title": "Sweets",
+      "tier1Prompt": "What dessert category do you crave most?",
+      "tier1Options": [
+        {
+          "code": "ice_cream",
+          "label": "Ice cream",
+          "tier2Prompt": "Pick your style:",
+          "tier2Options": ["local_flavors", "classic_flavors"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "local_flavors": [
+              { "prompt": "Flavor pick:", "options": ["ube", "mango"] },
+              { "prompt": "Texture preference?", "options": ["smooth", "chunky"] }
+            ],
+            "classic_flavors": [
+              { "prompt": "Flavor pick:", "options": ["vanilla", "chocolate"] },
+              { "prompt": "Cone or cup?", "options": ["cone", "cup"] }
+            ]
+          }
+        },
+        {
+          "code": "cakes",
+          "label": "Cakes",
+          "tier2Prompt": "Mood:",
+          "tier2Options": ["birthday_style", "coffee_shop_style"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "birthday_style": [
+              { "prompt": "Type?", "options": ["chiffon", "moist_cake"] },
+              { "prompt": "Frosting?", "options": ["buttercream", "whipped"] }
+            ],
+            "coffee_shop_style": [
+              { "prompt": "Pick one:", "options": ["cheesecake", "carrot_cake"] },
+              { "prompt": "Sweetness level?", "options": ["light", "rich"] }
+            ]
+          }
+        },
+        {
+          "code": "pastries",
+          "label": "Pastries",
+          "tier2Prompt": "Pick one:",
+          "tier2Options": ["buttery", "filled"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "buttery": [
+              { "prompt": "Texture?", "options": ["flaky", "soft"] },
+              { "prompt": "Best pair?", "options": ["coffee", "tea"] }
+            ],
+            "filled": [
+              { "prompt": "Filling style?", "options": ["fruit", "cream"] },
+              { "prompt": "When do you eat it?", "options": ["morning", "late_night"] }
+            ]
+          }
+        },
+        {
+          "code": "chocolate",
+          "label": "Chocolate desserts",
+          "tier2Prompt": "Choose your lane:",
+          "tier2Options": ["baked", "frozen"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "baked": [
+              { "prompt": "Pick one:", "options": ["brownie", "lava_cake"] },
+              { "prompt": "Chocolate intensity?", "options": ["milk", "dark"] }
+            ],
+            "frozen": [
+              { "prompt": "Pick one:", "options": ["gelato", "fudge_bar"] },
+              { "prompt": "Topping?", "options": ["nuts", "sprinkles"] }
+            ]
+          }
+        }
+      ],
+      "freeTextPrompt": "Optional: favorite sweet treat"
+    },
+    {
+      "routeId": "family_life",
+      "title": "Family Life",
+      "tier1Prompt": "Which life topic is most relatable right now?",
+      "tier1Options": [
+        {
+          "code": "toddlers",
+          "label": "Toddlers",
+          "tier2Prompt": "Most relatable moment?",
+          "tier2Options": ["playtime", "bedtime"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "playtime": [
+              { "prompt": "Preferred activity?", "options": ["outdoors", "indoors"] },
+              { "prompt": "Energy level?", "options": ["chill", "full_power"] }
+            ],
+            "bedtime": [
+              { "prompt": "Routine style?", "options": ["strict", "flexible"] },
+              { "prompt": "Storytime?", "options": ["yes", "no"] }
+            ]
+          }
+        },
+        {
+          "code": "school_age",
+          "label": "School-age kids",
+          "tier2Prompt": "Main topic lately?",
+          "tier2Options": ["homework", "activities"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "homework": [
+              { "prompt": "Support mode?", "options": ["hands_on", "independent"] },
+              { "prompt": "Peak stress time?", "options": ["weekdays", "weekends"] }
+            ],
+            "activities": [
+              { "prompt": "Type?", "options": ["sports", "arts"] },
+              { "prompt": "Schedule style?", "options": ["fixed", "flexible"] }
+            ]
+          }
+        },
+        {
+          "code": "caregiving",
+          "label": "Caregiving",
+          "tier2Prompt": "Biggest challenge?",
+          "tier2Options": ["time", "energy"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "time": [
+              { "prompt": "Support source?", "options": ["family", "hired_help"] },
+              { "prompt": "Planning style?", "options": ["calendar", "as_needed"] }
+            ],
+            "energy": [
+              { "prompt": "Recovery style?", "options": ["quiet_time", "exercise"] },
+              { "prompt": "Help pattern?", "options": ["daily", "weekly"] }
+            ]
+          }
+        },
+        {
+          "code": "single_life",
+          "label": "Single life",
+          "tier2Prompt": "Preferred social pace?",
+          "tier2Options": ["small_groups", "big_groups"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "small_groups": [
+              { "prompt": "Hangout type?", "options": ["coffee", "dinner"] },
+              { "prompt": "Planning style?", "options": ["planned", "spontaneous"] }
+            ],
+            "big_groups": [
+              { "prompt": "Go-to event?", "options": ["concert", "sports"] },
+              { "prompt": "Energy style?", "options": ["observer", "life_of_party"] }
+            ]
+          }
+        }
+      ],
+      "freeTextPrompt": "Optional: one life topic you can talk about for hours"
+    },
+    {
+      "routeId": "travel",
+      "title": "Travel",
+      "tier1Prompt": "What type of trip do you enjoy most?",
+      "tier1Options": [
+        {
+          "code": "city_break",
+          "label": "City break",
+          "tier2Prompt": "Priority?",
+          "tier2Options": ["food_hunt", "culture_spots"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "food_hunt": [
+              { "prompt": "Trip city vibe?", "options": ["metro_manila", "cebu"] },
+              { "prompt": "Pace?", "options": ["packed", "chill"] }
+            ],
+            "culture_spots": [
+              { "prompt": "Type?", "options": ["museums", "heritage_sites"] },
+              { "prompt": "Guide style?", "options": ["self_guided", "with_guide"] }
+            ]
+          }
+        },
+        {
+          "code": "beach",
+          "label": "Beach",
+          "tier2Prompt": "Vibe?",
+          "tier2Options": ["quiet", "party"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "quiet": [
+              { "prompt": "Top activity?", "options": ["sunset_walk", "reading"] },
+              { "prompt": "Stay style?", "options": ["resort", "airbnb"] }
+            ],
+            "party": [
+              { "prompt": "Best timing?", "options": ["day", "night"] },
+              { "prompt": "Crew size?", "options": ["small", "big"] }
+            ]
+          }
+        },
+        {
+          "code": "mountains",
+          "label": "Mountains",
+          "tier2Prompt": "Preferred activity?",
+          "tier2Options": ["hiking", "scenic_relax"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "hiking": [
+              { "prompt": "Trail style?", "options": ["day_hike", "overnight"] },
+              { "prompt": "Difficulty?", "options": ["moderate", "challenging"] }
+            ],
+            "scenic_relax": [
+              { "prompt": "Setting?", "options": ["cabin", "camp"] },
+              { "prompt": "Main draw?", "options": ["view", "cold_weather"] }
+            ]
+          }
+        },
+        {
+          "code": "road_trip",
+          "label": "Road trip",
+          "tier2Prompt": "Companion type?",
+          "tier2Options": ["solo", "friends"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "solo": [
+              { "prompt": "Drive distance?", "options": ["short", "long"] },
+              { "prompt": "Stops style?", "options": ["planned", "discover_along_way"] }
+            ],
+            "friends": [
+              { "prompt": "Destination vibe?", "options": ["tagaytay", "batangas"] },
+              { "prompt": "Playlist mood?", "options": ["throwbacks", "new_hits"] }
+            ]
+          }
+        }
+      ],
+      "freeTextPrompt": "Optional: your most unforgettable trip"
+    },
+    {
+      "routeId": "entertainment",
+      "title": "Entertainment",
+      "tier1Prompt": "What do you watch/listen to the most right now?",
+      "tier1Options": [
+        {
+          "code": "series",
+          "label": "Series",
+          "tier2Prompt": "Preferred tone?",
+          "tier2Options": ["drama", "comedy"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "drama": [
+              { "prompt": "Pace?", "options": ["slow_burn", "fast_paced"] },
+              { "prompt": "Watch style?", "options": ["binge", "episodic"] }
+            ],
+            "comedy": [
+              { "prompt": "Style?", "options": ["sitcom", "dark_comedy"] },
+              { "prompt": "Best with?", "options": ["friends", "solo"] }
+            ]
+          }
+        },
+        {
+          "code": "movies",
+          "label": "Movies",
+          "tier2Prompt": "Movie mood?",
+          "tier2Options": ["blockbuster", "indie"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "blockbuster": [
+              { "prompt": "Genre?", "options": ["action", "fantasy"] },
+              { "prompt": "Watch where?", "options": ["cinema", "home"] }
+            ],
+            "indie": [
+              { "prompt": "Origin?", "options": ["local", "international"] },
+              { "prompt": "Preference?", "options": ["story", "visuals"] }
+            ]
+          }
+        },
+        {
+          "code": "music",
+          "label": "Music",
+          "tier2Prompt": "Listening mode?",
+          "tier2Options": ["opm", "global"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "opm": [
+              { "prompt": "Vibe?", "options": ["hugot", "upbeat"] },
+              { "prompt": "Listening context?", "options": ["commute", "deep_work"] }
+            ],
+            "global": [
+              { "prompt": "Type?", "options": ["pop", "alt"] },
+              { "prompt": "Discovery?", "options": ["curated", "algorithmic"] }
+            ]
+          }
+        },
+        {
+          "code": "podcasts",
+          "label": "Podcasts",
+          "tier2Prompt": "Pick your feed:",
+          "tier2Options": ["stories", "tech_business"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "stories": [
+              { "prompt": "Tone?", "options": ["romance", "horror"] },
+              { "prompt": "Listening time?", "options": ["late_night", "commute"] }
+            ],
+            "tech_business": [
+              { "prompt": "Focus?", "options": ["startups", "ai_tools"] },
+              { "prompt": "Playback style?", "options": ["1x", "1_5x"] }
+            ]
+          }
+        }
+      ],
+      "freeTextPrompt": "Optional: one title you recommend to everyone"
+    },
+    {
+      "routeId": "work_style",
+      "title": "Work Style",
+      "tier1Prompt": "Which work mode feels most like you?",
+      "tier1Options": [
+        {
+          "code": "builder",
+          "label": "Builder",
+          "tier2Prompt": "Execution mode?",
+          "tier2Options": ["ship_fast", "polish_first"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "ship_fast": [
+              { "prompt": "Release rhythm?", "options": ["daily", "weekly"] },
+              { "prompt": "Testing style?", "options": ["minimum_viable", "balanced"] }
+            ],
+            "polish_first": [
+              { "prompt": "Priority?", "options": ["ux", "stability"] },
+              { "prompt": "Review style?", "options": ["peer", "checklist"] }
+            ]
+          }
+        },
+        {
+          "code": "strategist",
+          "label": "Strategist",
+          "tier2Prompt": "Planning style?",
+          "tier2Options": ["long_term", "iterative"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "long_term": [
+              { "prompt": "Roadmap horizon?", "options": ["quarterly", "annual"] },
+              { "prompt": "Decision input?", "options": ["data", "vision"] }
+            ],
+            "iterative": [
+              { "prompt": "Loop speed?", "options": ["daily", "weekly"] },
+              { "prompt": "Adjustment style?", "options": ["experiment", "retro"] }
+            ]
+          }
+        },
+        {
+          "code": "operator",
+          "label": "Operator",
+          "tier2Prompt": "Execution preference?",
+          "tier2Options": ["process", "improvise"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "process": [
+              { "prompt": "Documentation level?", "options": ["detailed", "light"] },
+              { "prompt": "Handoffs?", "options": ["structured", "quick_sync"] }
+            ],
+            "improvise": [
+              { "prompt": "Response mode?", "options": ["rapid", "reflective"] },
+              { "prompt": "Escalation style?", "options": ["early", "last_resort"] }
+            ]
+          }
+        },
+        {
+          "code": "connector",
+          "label": "Connector",
+          "tier2Prompt": "Network style?",
+          "tier2Options": ["deep", "broad"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "deep": [
+              { "prompt": "Conversation style?", "options": ["mentorship", "peer_exchange"] },
+              { "prompt": "Follow-up mode?", "options": ["scheduled", "as_needed"] }
+            ],
+            "broad": [
+              { "prompt": "Event style?", "options": ["community_meetups", "big_conferences"] },
+              { "prompt": "Connection cadence?", "options": ["weekly", "monthly"] }
+            ]
+          }
+        }
+      ],
+      "freeTextPrompt": "Optional: your favorite way to collaborate"
+    },
+    {
+      "routeId": "hobbies",
+      "title": "Hobbies",
+      "tier1Prompt": "Which hobby bucket best fits you now?",
+      "tier1Options": [
+        {
+          "code": "fitness",
+          "label": "Fitness",
+          "tier2Prompt": "Pick your mode:",
+          "tier2Options": ["running", "classes"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "running": [
+              { "prompt": "Route style?", "options": ["city_run", "park_run"] },
+              { "prompt": "Timing?", "options": ["morning", "night"] }
+            ],
+            "classes": [
+              { "prompt": "Type?", "options": ["pilates", "spin"] },
+              { "prompt": "Motivation?", "options": ["strength", "stress_relief"] }
+            ]
+          }
+        },
+        {
+          "code": "creative",
+          "label": "Creative arts",
+          "tier2Prompt": "Format?",
+          "tier2Options": ["visual", "writing"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "visual": [
+              { "prompt": "Medium?", "options": ["digital", "traditional"] },
+              { "prompt": "Workflow?", "options": ["solo", "collab"] }
+            ],
+            "writing": [
+              { "prompt": "Type?", "options": ["journal", "long_form"] },
+              { "prompt": "When?", "options": ["daily", "weekly"] }
+            ]
+          }
+        },
+        {
+          "code": "gaming",
+          "label": "Gaming",
+          "tier2Prompt": "Genre?",
+          "tier2Options": ["competitive", "casual"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "competitive": [
+              { "prompt": "Mode?", "options": ["team", "solo"] },
+              { "prompt": "Platform?", "options": ["pc_console", "mobile"] }
+            ],
+            "casual": [
+              { "prompt": "Session length?", "options": ["short", "long"] },
+              { "prompt": "Play style?", "options": ["story", "puzzle"] }
+            ]
+          }
+        },
+        {
+          "code": "collecting",
+          "label": "Collecting",
+          "tier2Prompt": "Type?",
+          "tier2Options": ["physical", "digital"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "physical": [
+              { "prompt": "Category?", "options": ["figures", "cards"] },
+              { "prompt": "Approach?", "options": ["rare_items", "curated_sets"] }
+            ],
+            "digital": [
+              { "prompt": "Focus?", "options": ["photos", "nfts"] },
+              { "prompt": "Habit?", "options": ["daily", "occasionally"] }
+            ]
+          }
+        }
+      ],
+      "freeTextPrompt": "Optional: one hobby detail that surprises people"
+    },
+    {
+      "routeId": "hot_takes",
+      "title": "Hot Takes",
+      "tier1Prompt": "Pick a low-stakes hot-take category.",
+      "tier1Options": [
+        {
+          "code": "food_opinions",
+          "label": "Food opinions",
+          "tier2Prompt": "Debate mode?",
+          "tier2Options": ["mild", "spicy"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "mild": [
+              { "prompt": "Preferred tone?", "options": ["funny", "chill"] },
+              { "prompt": "Topic style?", "options": ["dessert", "savory"] }
+            ],
+            "spicy": [
+              { "prompt": "Energy?", "options": ["playful", "serious"] },
+              { "prompt": "Audience?", "options": ["one_on_one", "group"] }
+            ]
+          }
+        },
+        {
+          "code": "productivity",
+          "label": "Productivity habits",
+          "tier2Prompt": "Work rhythm?",
+          "tier2Options": ["deep_focus", "multitask"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "deep_focus": [
+              { "prompt": "Session type?", "options": ["long_blocks", "pomodoro"] },
+              { "prompt": "Environment?", "options": ["quiet", "music"] }
+            ],
+            "multitask": [
+              { "prompt": "Driver?", "options": ["high_energy", "deadline"] },
+              { "prompt": "Tooling?", "options": ["task_board", "notes"] }
+            ]
+          }
+        },
+        {
+          "code": "entertainment_opinions",
+          "label": "Entertainment opinions",
+          "tier2Prompt": "Opinion strength?",
+          "tier2Options": ["contrarian", "mainstream"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "contrarian": [
+              { "prompt": "Topic?", "options": ["series_finales", "music_rankings"] },
+              { "prompt": "Delivery?", "options": ["deadpan", "animated"] }
+            ],
+            "mainstream": [
+              { "prompt": "Scene?", "options": ["opm", "global_pop"] },
+              { "prompt": "Discussion style?", "options": ["debate", "agree_and_expand"] }
+            ]
+          }
+        },
+        {
+          "code": "tech_opinions",
+          "label": "Tech opinions",
+          "tier2Prompt": "Adoption style?",
+          "tier2Options": ["early", "wait_and_see"],
+          "tier3Mode": "branch_specific_dual",
+          "tier3ByTier2": {
+            "early": [
+              { "prompt": "Experiment style?", "options": ["weekend_hacks", "prod_trials"] },
+              { "prompt": "Stack preference?", "options": ["ai_first", "stable_first"] }
+            ],
+            "wait_and_see": [
+              { "prompt": "Decision trigger?", "options": ["team_adoption", "roi_proven"] },
+              { "prompt": "Risk posture?", "options": ["conservative", "balanced"] }
+            ]
+          }
+        }
+      ],
+      "freeTextPrompt": "Optional: your favorite low-stakes hot take"
+    }
+  ]
+}

@@ -820,7 +820,13 @@ const bindQuestionsPage = () => {
 
   const hydrate = async () => {
     try {
-      const catalog = await apiFetch("/api/routes/catalog", { method: "GET" });
+      /** Static JSON ships with the web app (Vercel rewrite → apps/web); avoids serverless FS issues. */
+      let catalog;
+      try {
+        catalog = await apiFetch("/icebreaker-routes.v1.json", { method: "GET" });
+      } catch (_staticErr) {
+        catalog = await apiFetch("/api/routes/catalog", { method: "GET" });
+      }
       const routes = Array.isArray(catalog.routes) ? catalog.routes : [];
       if (routes.length === 0) {
         pill.textContent = "Unavailable";
