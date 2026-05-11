@@ -281,18 +281,46 @@ const normalizeAnswers = (answers) => {
     }));
 };
 
-const getBody = (req) => {
-  if (!req.body) {
+/**
+ * Vercel Node serverless often leaves `req.body` unset; the JSON payload must be read from the stream.
+ */
+const readJsonBody = async (req) => {
+  const method = req.method || "GET";
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
     return {};
   }
-  if (typeof req.body === "string") {
-    try {
-      return JSON.parse(req.body);
-    } catch (_error) {
-      return {};
+  const raw = req.body;
+  if (raw !== undefined && raw !== null) {
+    if (typeof raw === "string") {
+      try {
+        const t = raw.trim();
+        return t ? JSON.parse(t) : {};
+      } catch (_e) {
+        return {};
+      }
+    }
+    if (Buffer.isBuffer(raw)) {
+      try {
+        const t = raw.toString("utf8").trim();
+        return t ? JSON.parse(t) : {};
+      } catch (_e) {
+        return {};
+      }
+    }
+    if (typeof raw === "object") {
+      return raw;
     }
   }
-  return req.body;
+  try {
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), "utf8"));
+    }
+    const text = Buffer.concat(chunks).toString("utf8").trim();
+    return text ? JSON.parse(text) : {};
+  } catch (_e) {
+    return {};
+  }
 };
 
 const getUserId = (req, body) =>
@@ -409,11 +437,14 @@ const resolveHandlerPath = (req) => {
   return `/${pathname}`;
 };
 
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
   const path = resolveHandlerPath(req);
-  const body = getBody(req);
 
   try {
+    let body = {};
+    if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") {
+      body = await readJsonBody(req);
+    }
     if (req.method === "GET" && path === "/health") {
       sendJson(res, 200, { ok: true, service: "api", mode: "vercel" });
       return;
@@ -458,18 +489,16 @@ module.exports = (req, res) => {
     }
 
     if (req.method === "POST" && path === "/auth/session") {
-      const provider = body.provider;
+      const provider = body && body.provider;
       if (provider !== "google" && provider !== "linkedin") {
-        sendJson(res, 400, { ok: false, error: "provider must be google or linkedin" });
-        return;
-      }
-      if (provider === "linkedin" && !body.demoMode) {
         sendJson(res, 400, {
           ok: false,
-          error: "LinkedIn is not enabled in MVP runtime. Use google or demo mode.",
+          error:
+            'JSON body must include "provider": "linkedin" or "google". If you see this from the web app, the request body was not parsed (check Content-Type: application/json).',
         });
         return;
       }
+      /** MVP: both providers return a stub session only (no real OAuth on this endpoint). */
       const userId = body.userId || randomUUID();
       store.sessions.set(userId, {
         provider,

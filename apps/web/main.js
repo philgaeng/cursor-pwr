@@ -90,7 +90,7 @@ const ensureStep = () => {
     return false;
   }
   if (["questions", "consent", "queue", "vault"].includes(page) && !state.profile) {
-    navigate("./profile.html");
+    navigate("/profile.html");
     return false;
   }
   if (["consent", "queue", "vault"].includes(page) && state.icebreakerResponses.length < 3) {
@@ -322,7 +322,7 @@ const bindAuthPage = () => {
   };
 
   const continueToDetailsGathering = () => {
-    navigate("./profile.html?step=02_details_gathering");
+    navigate("/profile.html?step=02_details_gathering");
   };
 
   const saveBootstrap = (provider, session) => {
@@ -344,10 +344,18 @@ const bindAuthPage = () => {
   };
 
   const authenticateProvider = async (provider) => {
+    const primaryBtn = provider === "linkedin" ? linkedInButton : googleButton;
+    primaryBtn.disabled = true;
+    setStatus(provider === "linkedin" ? "Starting LinkedIn (demo sign-in)…" : "Starting Google (demo sign-in)…", "info");
     try {
       const session = await apiFetch("/api/auth/session", {
         method: "POST",
-        body: JSON.stringify({ provider, eventId: state.eventId || undefined }),
+        body: JSON.stringify({
+          provider,
+          eventId: state.eventId || undefined,
+          /** MVP stub: server issues a session without real OAuth; marks intent for analytics. */
+          demoMode: true,
+        }),
       });
       saveBootstrap(provider, session);
       setStatus(`Signed in with ${provider}.`, "success");
@@ -355,10 +363,12 @@ const bindAuthPage = () => {
     } catch (error) {
       const reason = error instanceof Error ? error.message : `${provider} sign-in failed.`;
       if (provider === "linkedin") {
-        showGoogleFallback(`${reason} Continue with Google.`);
+        showGoogleFallback(`${reason} You can continue with Google.`);
       } else {
         showManualFallback(`${reason} Continue with manual entry.`);
       }
+    } finally {
+      primaryBtn.disabled = false;
     }
   };
 
