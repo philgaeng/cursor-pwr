@@ -363,6 +363,13 @@ const createWave = (eventId) => ({
 });
 
 const resolveHandlerPath = (req) => {
+  if (Object.prototype.hasOwnProperty.call(req.query || {}, "path")) {
+    const pathParam = req.query.path;
+    const raw = Array.isArray(pathParam) ? pathParam.join("/") : String(pathParam ?? "");
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? (trimmed.startsWith("/") ? trimmed : `/${trimmed}`) : "/";
+  }
+
   const rawUrl = typeof req.url === "string" ? req.url : "";
   const pathname = rawUrl.split("?")[0] || "/";
 
