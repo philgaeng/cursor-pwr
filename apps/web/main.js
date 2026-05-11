@@ -47,7 +47,16 @@ const defaultState = {
 const loadState = () => {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-    return { ...defaultState, ...(parsed || {}) };
+    const merged = { ...defaultState, ...(parsed || {}) };
+    return {
+      ...merged,
+      answers: Array.isArray(merged.answers) ? merged.answers : [],
+      icebreakerResponses: Array.isArray(merged.icebreakerResponses) ? merged.icebreakerResponses : [],
+      assignedRouteIds: Array.isArray(merged.assignedRouteIds) ? merged.assignedRouteIds : [],
+      actions: Array.isArray(merged.actions) ? merged.actions : [],
+      profile: merged.profile && typeof merged.profile === "object" ? merged.profile : null,
+      auth: merged.auth && typeof merged.auth === "object" ? merged.auth : null,
+    };
   } catch (_error) {
     return { ...defaultState };
   }
@@ -85,15 +94,17 @@ const shuffle = (items) => {
 /** Returns false if a redirect was triggered (do not bind page handlers). */
 const ensureStep = () => {
   if (page === "organizer") return true;
+  const hasProfile = Boolean(state.profile && typeof state.profile === "object");
+  const responseCount = Array.isArray(state.icebreakerResponses) ? state.icebreakerResponses.length : 0;
   if (page !== "auth" && !state.auth) {
     navigate("./index.html");
     return false;
   }
-  if (["questions", "consent", "queue", "vault"].includes(page) && !state.profile) {
+  if (["questions", "consent", "queue", "vault"].includes(page) && !hasProfile) {
     navigate("/profile.html");
     return false;
   }
-  if (["consent", "queue", "vault"].includes(page) && state.icebreakerResponses.length < 3) {
+  if (["consent", "queue", "vault"].includes(page) && responseCount < 3) {
     navigate("./questions.html");
     return false;
   }
