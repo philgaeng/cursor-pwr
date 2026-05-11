@@ -82,12 +82,26 @@ const shuffle = (items) => {
   return clone;
 };
 
+/** Returns false if a redirect was triggered (do not bind page handlers). */
 const ensureStep = () => {
-  if (page === "organizer") return;
-  if (page !== "auth" && !state.auth) navigate("./index.html");
-  if (["questions", "consent", "queue", "vault"].includes(page) && !state.profile) navigate("./profile.html");
-  if (["consent", "queue", "vault"].includes(page) && state.icebreakerResponses.length < 3) navigate("./questions.html");
-  if (["queue", "vault"].includes(page) && !state.onboardingComplete) navigate("./consent.html");
+  if (page === "organizer") return true;
+  if (page !== "auth" && !state.auth) {
+    navigate("./index.html");
+    return false;
+  }
+  if (["questions", "consent", "queue", "vault"].includes(page) && !state.profile) {
+    navigate("./profile.html");
+    return false;
+  }
+  if (["consent", "queue", "vault"].includes(page) && state.icebreakerResponses.length < 3) {
+    navigate("./questions.html");
+    return false;
+  }
+  if (["queue", "vault"].includes(page) && !state.onboardingComplete) {
+    navigate("./consent.html");
+    return false;
+  }
+  return true;
 };
 
 const normalizeWave = (wave) => {
@@ -125,9 +139,28 @@ const mockWave = () =>
 
 const apiFetch = async (path, options = {}) => {
   const url = path.startsWith("http") ? path : `${API_BASE_URL}${path}`;
-  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  const method = String(options.method || "GET").toUpperCase();
+  const headers = { ...(options.headers || {}) };
+  if (method !== "GET" && method !== "HEAD") {
+    headers["Content-Type"] = headers["Content-Type"] || "application/json";
+  }
   if (state.userId) headers["X-User-Id"] = state.userId;
-  const response = await fetch(url, { ...options, headers });
+
+  const timeoutMs = typeof options.timeoutMs === "number" ? options.timeoutMs : 25000;
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+  let response;
+  try {
+    response = await fetch(url, { ...options, method: method || "GET", headers, signal: ctrl.signal });
+  } catch (err) {
+    clearTimeout(tid);
+    if (err && err.name === "AbortError") {
+      throw new Error("Request timed out. Try again or check the deployment.");
+    }
+    throw err;
+  }
+  clearTimeout(tid);
+
   if (!response.ok) {
     try {
       const payload = await response.json();
@@ -1290,11 +1323,12 @@ const bindOrganizerPage = () => {
   load();
 };
 
-ensureStep();
-if (page === "auth") bindAuthPage();
-if (page === "profile") bindProfilePage();
-if (page === "questions") bindQuestionsPage();
-if (page === "consent") bindConsentPage();
-if (page === "queue") bindQueuePage();
-if (page === "vault") bindVaultPage();
-if (page === "organizer") bindOrganizerPage();
+if (ensureStep()) {
+  if (page === "auth") bindAuthPage();
+  if (page === "profile") bindProfilePage();
+  if (page === "questions") bindQuestionsPage();
+  if (page === "consent") bindConsentPage();
+  if (page === "queue") bindQueuePage();
+  if (page === "vault") bindVaultPage();
+  if (page === "organizer") bindOrganizerPage();
+}

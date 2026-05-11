@@ -9,6 +9,8 @@ This folder is the source of truth for route definitions used by:
 
 - `icebreaker-routes.v1.json`
 
+**Vercel API bundle:** the serverless handler also reads `api/icebreaker-routes.v1.json` (a copy next to `api/handler.js`). After you edit the canonical JSON here, copy it to `api/icebreaker-routes.v1.json` before deploy (or automate that in CI) so production stays in sync.
+
 ## Why JSON First
 
 - Three-tier route structures are easier to validate and consume from code.

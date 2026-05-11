@@ -221,6 +221,7 @@ const getRouteCatalog = () => {
     return globalThis.__routeCatalog;
   }
   const candidates = [
+    path.join(__dirname, "icebreaker-routes.v1.json"),
     path.join(__dirname, "..", "docs", "resource", "icebreaker-routes.v1.json"),
     path.join(process.cwd(), "docs", "resource", "icebreaker-routes.v1.json"),
   ];
