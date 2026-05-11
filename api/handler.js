@@ -220,18 +220,23 @@ const getRouteCatalog = () => {
   if (globalThis.__routeCatalog) {
     return globalThis.__routeCatalog;
   }
-  if (globalThis.__routeCatalogFailed) {
-    return null;
+  const candidates = [
+    path.join(__dirname, "..", "docs", "resource", "icebreaker-routes.v1.json"),
+    path.join(process.cwd(), "docs", "resource", "icebreaker-routes.v1.json"),
+  ];
+  for (const filePath of candidates) {
+    try {
+      if (!fs.existsSync(filePath)) {
+        continue;
+      }
+      const raw = fs.readFileSync(filePath, "utf8");
+      globalThis.__routeCatalog = JSON.parse(raw);
+      return globalThis.__routeCatalog;
+    } catch (_error) {
+      continue;
+    }
   }
-  try {
-    const filePath = path.join(__dirname, "..", "docs", "resource", "icebreaker-routes.v1.json");
-    const raw = fs.readFileSync(filePath, "utf8");
-    globalThis.__routeCatalog = JSON.parse(raw);
-  } catch (_error) {
-    globalThis.__routeCatalogFailed = true;
-    return null;
-  }
-  return globalThis.__routeCatalog;
+  return null;
 };
 
 const sendJson = (res, statusCode, payload) => {

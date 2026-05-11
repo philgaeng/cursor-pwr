@@ -196,6 +196,18 @@ button,
   min-height: 120px;
 }
 
+.icebreaker-hint {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #475569;
+}
+
+.icebreaker-hint--error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 .icebreaker-nav {
   display: flex;
   justify-content: flex-start;

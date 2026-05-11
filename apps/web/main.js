@@ -504,6 +504,19 @@ const bindQuestionsPage = () => {
   const backBtn = document.getElementById("icebreaker-back");
   if (!stage || !pill || !routeTitleEl || !promptEl || !backBtn) return;
 
+  const showStageHint = (text, className = "icebreaker-hint") => {
+    stage.textContent = "";
+    const p = document.createElement("p");
+    p.className = className;
+    p.textContent = text;
+    stage.appendChild(p);
+  };
+
+  pill.textContent = "Loading…";
+  routeTitleEl.textContent = "";
+  promptEl.textContent = "";
+  showStageHint("Loading route choices…");
+
   let assignedRoutes = [];
   let routeIndex = 0;
   let draft = null;
@@ -777,6 +790,8 @@ const bindQuestionsPage = () => {
       const catalog = await apiFetch("/api/routes/catalog", { method: "GET" });
       const routes = Array.isArray(catalog.routes) ? catalog.routes : [];
       if (routes.length === 0) {
+        pill.textContent = "Unavailable";
+        showStageHint("No routes in catalog. Try again or contact support.", "icebreaker-hint icebreaker-hint--error");
         setStatus("No route catalog available.", "error");
         return;
       }
@@ -788,6 +803,8 @@ const bindQuestionsPage = () => {
         .map((id) => routes.find((r) => r.routeId === id))
         .filter(Boolean);
       if (assignedRoutes.length < REQUIRED_ASSIGNED_ROUTES) {
+        pill.textContent = "Error";
+        showStageHint("Assigned routes could not be resolved from the catalog.", "icebreaker-hint icebreaker-hint--error");
         setStatus("Assigned routes could not be resolved.", "error");
         return;
       }
@@ -815,7 +832,13 @@ const bindQuestionsPage = () => {
       );
       render();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Unable to load route catalog.", "error");
+      const msg = error instanceof Error ? error.message : "Unable to load route catalog.";
+      pill.textContent = "Couldn’t load";
+      showStageHint(
+        `${msg} In DevTools → Network, confirm GET /api/routes/catalog returns 200 on this host.`,
+        "icebreaker-hint icebreaker-hint--error"
+      );
+      setStatus(msg, "error");
     }
   };
 
