@@ -21,8 +21,38 @@
           <button type="button" id="organizer-reload" class="ghost-btn">Reload from server</button>
         </div>
 
+        <div class="organizer-nav">
+          <div class="organizer-nav-desktop" role="tablist" aria-label="Organizer sections">
+            <button type="button" class="organizer-tab-btn" data-section-target="section-organizer">Organizer</button>
+            <button type="button" class="organizer-tab-btn" data-section-target="section-event">Event</button>
+            <button type="button" class="organizer-tab-btn" data-section-target="section-freebies">Freebies</button>
+            <button type="button" class="organizer-tab-btn" data-section-target="section-attendance">Attendance</button>
+            <button type="button" class="organizer-tab-btn" data-section-target="section-routes">Routes</button>
+            <button type="button" class="organizer-tab-btn" data-section-target="section-meetup">Meetup</button>
+            <button type="button" class="organizer-tab-btn" data-section-target="section-onboarding">Onboarding</button>
+            <button type="button" class="organizer-tab-btn" data-section-target="section-matching">Matching</button>
+            <button type="button" class="organizer-tab-btn" data-section-target="section-privacy">Privacy</button>
+            <button type="button" class="organizer-tab-btn" data-section-target="section-json">JSON</button>
+          </div>
+          <div class="organizer-nav-mobile">
+            <button type="button" id="organizer-mobile-menu-toggle" class="ghost-btn">Menu</button>
+            <div id="organizer-mobile-menu" class="organizer-mobile-menu" hidden>
+              <button type="button" class="organizer-mobile-link" data-section-target="section-organizer">Organizer</button>
+              <button type="button" class="organizer-mobile-link" data-section-target="section-event">Event</button>
+              <button type="button" class="organizer-mobile-link" data-section-target="section-freebies">Freebies</button>
+              <button type="button" class="organizer-mobile-link" data-section-target="section-attendance">Attendance</button>
+              <button type="button" class="organizer-mobile-link" data-section-target="section-routes">Routes</button>
+              <button type="button" class="organizer-mobile-link" data-section-target="section-meetup">Meetup</button>
+              <button type="button" class="organizer-mobile-link" data-section-target="section-onboarding">Onboarding</button>
+              <button type="button" class="organizer-mobile-link" data-section-target="section-matching">Matching</button>
+              <button type="button" class="organizer-mobile-link" data-section-target="section-privacy">Privacy</button>
+              <button type="button" class="organizer-mobile-link" data-section-target="section-json">JSON</button>
+            </div>
+          </div>
+        </div>
+
         <form id="organizer-form" class="stack organizer-form">
-          <fieldset class="organizer-fieldset">
+          <fieldset class="organizer-fieldset organizer-section" id="section-organizer" data-organizer-section>
             <legend>Organizer</legend>
             <label>Organizer email (attendance / exports) <input id="org-email" type="email" required placeholder="you@company.com" /></label>
             <label class="checkbox-row organizer-checkbox"
@@ -37,26 +67,26 @@
             <label>LinkedIn <input id="org-social-li" type="text" placeholder="Profile URL" /></label>
           </fieldset>
 
-          <fieldset class="organizer-fieldset">
+          <fieldset class="organizer-fieldset organizer-section" id="section-event" data-organizer-section>
             <legend>Event info</legend>
             <label>Event name <input id="org-event-name" type="text" required placeholder="Founder mixer" /></label>
             <label>Description <textarea id="org-event-desc" rows="3" placeholder="What attendees should know"></textarea></label>
             <label>Outro message <textarea id="org-event-outro" rows="2" placeholder="Shown after intake"></textarea></label>
           </fieldset>
 
-          <fieldset class="organizer-fieldset">
+          <fieldset class="organizer-fieldset organizer-section" id="section-freebies" data-organizer-section>
             <legend>Freebies</legend>
             <label class="checkbox-row organizer-checkbox"><input id="org-freebies-enabled" type="checkbox" /> Show freebie links after intake</label>
             <label>Links (one URL per line) <textarea id="org-freebies-links" rows="3" placeholder="https://…"></textarea></label>
           </fieldset>
 
-          <fieldset class="organizer-fieldset">
+          <fieldset class="organizer-fieldset organizer-section" id="section-attendance" data-organizer-section>
             <legend>Attendance</legend>
             <label>Expected size <input id="org-attendance-size" type="number" min="1" step="1" required /></label>
             <label>Crowd description <textarea id="org-attendance-desc" rows="2" placeholder="Who is in the room?"></textarea></label>
           </fieldset>
 
-          <fieldset class="organizer-fieldset">
+          <fieldset class="organizer-fieldset organizer-section" id="section-routes" data-organizer-section>
             <legend>Question routes (8 suggestions)</legend>
             <p class="helper organizer-fieldset-hint">Free-text labels or route ids; must stay 8 entries for validation.</p>
             <div class="organizer-route-grid">
@@ -72,7 +102,16 @@
             <label>Crowd cues (for agents / auto routes) <textarea id="org-crowd-cues" rows="3" placeholder="Themes, tone, off-limits"></textarea></label>
           </fieldset>
 
-          <fieldset class="organizer-fieldset">
+          <fieldset class="organizer-fieldset organizer-section" id="section-meetup" data-organizer-section>
+            <legend>Physical meetup (spec 07)</legend>
+            <label class="checkbox-row organizer-checkbox"><input id="org-meetup-enabled" type="checkbox" /> Enable meetup routing after mutual like</label>
+            <label>Spaces (one per line) <textarea id="org-meetup-spaces" rows="3" placeholder="Main Hall North&#10;Coffee Bar"></textarea></label>
+            <label class="checkbox-row organizer-checkbox"><input id="org-meetup-signs-enabled" type="checkbox" /> Enable signs/flags</label>
+            <label>Signs or flags (one per line) <textarea id="org-meetup-sign-options" rows="3" placeholder="Red flag&#10;Blue flag"></textarea></label>
+            <label>Wearable prompt (when signs disabled) <input id="org-meetup-wearable-prompt" type="text" placeholder="What are you wearing so your match can spot you?" /></label>
+          </fieldset>
+
+          <fieldset class="organizer-fieldset organizer-section" id="section-onboarding" data-organizer-section>
             <legend>Onboarding parameters</legend>
             <div class="organizer-num-grid">
               <label>Required offer tags <input id="org-req-offers" type="number" min="1" step="1" /></label>
@@ -83,7 +122,7 @@
             </div>
           </fieldset>
 
-          <fieldset class="organizer-fieldset">
+          <fieldset class="organizer-fieldset organizer-section" id="section-matching" data-organizer-section>
             <legend>Matching (spec 04)</legend>
             <div class="organizer-num-grid">
               <label>Room strict-mode threshold (participants) <input id="org-room-threshold" type="number" min="1" step="1" /></label>
@@ -112,7 +151,7 @@
             <label class="checkbox-row organizer-checkbox"><input id="org-lowconf-label" type="checkbox" /> Label low-confidence matches in UI</label>
           </fieldset>
 
-          <fieldset class="organizer-fieldset">
+          <fieldset class="organizer-fieldset organizer-section" id="section-privacy" data-organizer-section>
             <legend>Privacy defaults</legend>
             <label class="checkbox-row organizer-checkbox"><input id="org-privacy-double" type="checkbox" /> Require double opt-in</label>
             <label
@@ -124,6 +163,18 @@
             </label>
             <label>Default auto-delete (hours after event) <input id="org-privacy-delete-hours" type="number" min="1" step="1" /></label>
             <label class="checkbox-row organizer-checkbox"><input id="org-privacy-audit" type="checkbox" /> Require consent audit trail</label>
+          </fieldset>
+
+          <fieldset class="organizer-fieldset organizer-section organizer-json-section" id="section-json" data-organizer-section>
+            <legend>Raw settings JSON</legend>
+            <p class="helper organizer-fieldset-hint">
+              Desktop shortcut for power users. Edit carefully, then apply or save.
+            </p>
+            <textarea id="org-settings-json" rows="14" spellcheck="false"></textarea>
+            <div class="organizer-json-actions">
+              <button type="button" id="org-json-refresh" class="ghost-btn">Refresh JSON from form</button>
+              <button type="button" id="org-json-apply" class="ghost-btn">Apply JSON to form</button>
+            </div>
           </fieldset>
 
           <button type="submit">Save event settings</button>

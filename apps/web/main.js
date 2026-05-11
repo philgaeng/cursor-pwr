@@ -42,6 +42,7 @@ const defaultState = {
   onboardingComplete: false,
   wave: null,
   actions: [],
+  meetupPlans: {},
 };
 
 const loadState = () => {
@@ -54,6 +55,7 @@ const loadState = () => {
       icebreakerResponses: Array.isArray(merged.icebreakerResponses) ? merged.icebreakerResponses : [],
       assignedRouteIds: Array.isArray(merged.assignedRouteIds) ? merged.assignedRouteIds : [],
       actions: Array.isArray(merged.actions) ? merged.actions : [],
+      meetupPlans: merged.meetupPlans && typeof merged.meetupPlans === "object" ? merged.meetupPlans : {},
       profile: merged.profile && typeof merged.profile === "object" ? merged.profile : null,
       auth: merged.auth && typeof merged.auth === "object" ? merged.auth : null,
     };
@@ -283,14 +285,56 @@ const renderVault = () => {
   const list = document.getElementById("connections-list");
   if (!list) return;
   list.innerHTML = "";
-  state.actions.forEach((entry) => {
+  const actionEntries = Array.isArray(state.actions) ? state.actions : [];
+  if (actionEntries.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "vault-item";
+    empty.textContent = "No actions yet. Go back to the queue and review candidates.";
+    list.appendChild(empty);
+    return;
+  }
+  actionEntries.forEach((entry) => {
     const candidate = state.wave?.candidates.find((item) => item.profile.id === entry.userId);
     const item = document.createElement("li");
     item.className = "vault-item";
     if (!candidate) {
       item.textContent = `${entry.action} recorded for ${entry.userId}.`;
     } else if (entry.action === "like" && entry.userId === "u2") {
-      item.textContent = `Mutual like with ${candidate.profile.fullName}. WhatsApp unlocked: ${candidate.profile.phone}`;
+      const meetup = state.meetupPlans?.[entry.userId];
+      const title = document.createElement("p");
+      title.textContent = `Mutual like with ${candidate.profile.fullName}. WhatsApp unlocked: ${candidate.profile.phone}`;
+      item.appendChild(title);
+      if (meetup?.instructionsForUser) {
+        const meetupInfo = document.createElement("p");
+        meetupInfo.textContent = `Meetup plan: ${meetup.instructionsForUser}`;
+        item.appendChild(meetupInfo);
+      } else {
+        const pending = document.createElement("p");
+        pending.textContent = "Fetching meetup instructions…";
+        item.appendChild(pending);
+      }
+      if (meetup?.requiresWearableMarker) {
+        const markerWrap = document.createElement("div");
+        markerWrap.className = "vault-marker-row";
+        const label = document.createElement("label");
+        label.textContent = meetup.wearablePrompt || "What are you wearing?";
+        const input = document.createElement("input");
+        input.type = "text";
+        input.placeholder = "e.g. black polo with white shoes";
+        input.value = meetup.yourWearableMarker || "";
+        input.dataset.targetUserId = entry.userId;
+        input.className = "vault-marker-input";
+        const saveBtn = document.createElement("button");
+        saveBtn.type = "button";
+        saveBtn.className = "ghost-btn";
+        saveBtn.dataset.action = "save-marker";
+        saveBtn.dataset.targetUserId = entry.userId;
+        saveBtn.textContent = meetup.yourWearableMarker ? "Update marker" : "Save marker";
+        label.appendChild(input);
+        markerWrap.appendChild(label);
+        markerWrap.appendChild(saveBtn);
+        item.appendChild(markerWrap);
+      }
     } else if (entry.action === "like") {
       item.textContent = `Liked ${candidate.profile.fullName}. Waiting for mutual like (locked).`;
     } else {
@@ -1042,7 +1086,66 @@ const bindQueuePage = () => {
 };
 
 const bindVaultPage = () => {
+  const list = document.getElementById("connections-list");
+  const mutualTargets = (state.actions || [])
+    .filter((entry) => entry.action === "like" && entry.userId === "u2")
+    .map((entry) => entry.userId);
+
+  const fetchMeetupPlan = async (targetUserId) => {
+    const response = await apiFetch(`/api/meetup/plan?targetUserId=${encodeURIComponent(targetUserId)}`, {
+      method: "GET",
+    });
+    if (!state.meetupPlans || typeof state.meetupPlans !== "object") {
+      state.meetupPlans = {};
+    }
+    state.meetupPlans[targetUserId] = response.meetup;
+    saveState(state);
+  };
+
+  const loadPlans = async () => {
+    if (mutualTargets.length === 0) return;
+    for (const targetUserId of mutualTargets) {
+      try {
+        await fetchMeetupPlan(targetUserId);
+      } catch (_error) {
+        continue;
+      }
+    }
+    renderVault();
+  };
+
+  if (list) {
+    list.addEventListener("click", async (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLButtonElement)) return;
+      if (target.dataset.action !== "save-marker") return;
+      const targetUserId = target.dataset.targetUserId;
+      if (!targetUserId) return;
+      const markerInput = list.querySelector(`input.vault-marker-input[data-target-user-id="${targetUserId}"]`);
+      const wearableMarker = markerInput instanceof HTMLInputElement ? markerInput.value.trim() : "";
+      if (!wearableMarker) {
+        setStatus("Please enter what you are wearing.", "error");
+        return;
+      }
+      target.disabled = true;
+      try {
+        await apiFetch("/api/meetup/preferences", {
+          method: "POST",
+          body: JSON.stringify({ wearableMarker }),
+        });
+        await fetchMeetupPlan(targetUserId);
+        renderVault();
+        setStatus("Meetup marker saved.", "success");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Failed to save marker.", "error");
+      } finally {
+        target.disabled = false;
+      }
+    });
+  }
+
   renderVault();
+  loadPlans();
 };
 
 const defaultOrganizerSettingsShape = () => ({
@@ -1080,6 +1183,15 @@ const defaultOrganizerSettingsShape = () => ({
   questionRoutes: {
     suggestions: ["", "", "", "", "", "", "", ""],
     crowdCues: "",
+  },
+  physicalMeetup: {
+    enabled: true,
+    spaces: ["Main Hall North", "Coffee Bar", "Side Lounge"],
+    signs: {
+      enabled: true,
+      options: ["Red flag", "Blue flag", "Yellow flag"],
+    },
+    wearablePrompt: "What are you wearing so your match can spot you quickly?",
   },
   parameters: {
     onboarding: {
@@ -1155,9 +1267,19 @@ const deepMerge = (target, source) => {
 const bindOrganizerPage = () => {
   const form = document.getElementById("organizer-form");
   const reloadBtn = document.getElementById("organizer-reload");
+  const jsonArea = document.getElementById("org-settings-json");
+  const jsonRefreshBtn = document.getElementById("org-json-refresh");
+  const jsonApplyBtn = document.getElementById("org-json-apply");
+  const desktopTabButtons = Array.from(document.querySelectorAll(".organizer-tab-btn"));
+  const mobileLinks = Array.from(document.querySelectorAll(".organizer-mobile-link"));
+  const sectionPanels = Array.from(document.querySelectorAll("[data-organizer-section]"));
+  const mobileMenuToggle = document.getElementById("organizer-mobile-menu-toggle");
+  const mobileMenu = document.getElementById("organizer-mobile-menu");
   if (!form) return;
 
   const getEl = (id) => document.getElementById(id);
+  const ORGANIZER_SECTION_KEY = "nexuslink-organizer-active-section";
+  let activeSectionId = "section-organizer";
 
   const applyToForm = (raw) => {
     const s = deepMerge(defaultOrganizerSettingsShape(), raw || {});
@@ -1192,6 +1314,13 @@ const bindOrganizerPage = () => {
       if (input) input.value = suggestions[i] || "";
     }
     getEl("org-crowd-cues").value = s.questionRoutes?.crowdCues || "";
+    const meetupSpaces = Array.isArray(s.physicalMeetup?.spaces) ? s.physicalMeetup.spaces : [];
+    const meetupSigns = Array.isArray(s.physicalMeetup?.signs?.options) ? s.physicalMeetup.signs.options : [];
+    getEl("org-meetup-enabled").checked = s.physicalMeetup?.enabled !== false;
+    getEl("org-meetup-spaces").value = meetupSpaces.join("\n");
+    getEl("org-meetup-signs-enabled").checked = s.physicalMeetup?.signs?.enabled !== false;
+    getEl("org-meetup-sign-options").value = meetupSigns.join("\n");
+    getEl("org-meetup-wearable-prompt").value = s.physicalMeetup?.wearablePrompt || "";
 
     const onb = s.parameters?.onboarding || {};
     getEl("org-req-offers").value = String(onb.requiredOfferTags ?? 3);
@@ -1230,6 +1359,64 @@ const bindOrganizerPage = () => {
     getEl("org-privacy-audit").checked = p.requireConsentAuditTrail !== false;
   };
 
+  const resolveInitialSection = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const querySection = urlParams.get("section");
+    if (querySection) {
+      const fromQuery = querySection.startsWith("section-") ? querySection : `section-${querySection}`;
+      if (sectionPanels.some((panel) => panel.id === fromQuery)) {
+        return fromQuery;
+      }
+    }
+    const storedSection = localStorage.getItem(ORGANIZER_SECTION_KEY);
+    if (storedSection && sectionPanels.some((panel) => panel.id === storedSection)) {
+      return storedSection;
+    }
+    return "section-organizer";
+  };
+
+  const setActiveSection = (sectionId, syncUrl = true) => {
+    if (!sectionPanels.some((panel) => panel.id === sectionId)) {
+      return;
+    }
+    activeSectionId = sectionId;
+    localStorage.setItem(ORGANIZER_SECTION_KEY, sectionId);
+    sectionPanels.forEach((panel) => {
+      const isActive = panel.id === sectionId;
+      panel.hidden = !isActive;
+      panel.classList.toggle("is-active", isActive);
+    });
+    [...desktopTabButtons, ...mobileLinks].forEach((button) => {
+      const isActive = button.dataset.sectionTarget === sectionId;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+    if (syncUrl) {
+      const url = new URL(window.location.href);
+      const shortSection = sectionId.replace(/^section-/, "");
+      url.searchParams.set("section", shortSection);
+      window.history.replaceState(null, "", url.toString());
+    }
+  };
+
+  const bindSectionNav = () => {
+    const allNavButtons = [...desktopTabButtons, ...mobileLinks];
+    allNavButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = button.dataset.sectionTarget;
+        if (!target) return;
+        setActiveSection(target);
+        if (mobileMenu) mobileMenu.hidden = true;
+      });
+    });
+    if (mobileMenuToggle && mobileMenu) {
+      mobileMenuToggle.addEventListener("click", () => {
+        mobileMenu.hidden = !mobileMenu.hidden;
+      });
+    }
+    setActiveSection(resolveInitialSection(), false);
+  };
+
   const readInt = (id, fallback) => {
     const v = parseInt(getEl(id).value, 10);
     return Number.isFinite(v) ? v : fallback;
@@ -1246,6 +1433,14 @@ const bindOrganizerPage = () => {
     for (let i = 0; i < 8; i += 1) {
       suggestions.push((getEl(`org-route-${i}`).value || "").trim());
     }
+    const meetupSpaces = getEl("org-meetup-spaces")
+      .value.split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const meetupSigns = getEl("org-meetup-sign-options")
+      .value.split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
 
     return {
       organizer: {
@@ -1282,6 +1477,16 @@ const bindOrganizerPage = () => {
       questionRoutes: {
         suggestions,
         crowdCues: getEl("org-crowd-cues").value,
+      },
+      physicalMeetup: {
+        enabled: getEl("org-meetup-enabled").checked,
+        spaces: meetupSpaces.length > 0 ? meetupSpaces : base.physicalMeetup.spaces,
+        signs: {
+          enabled: getEl("org-meetup-signs-enabled").checked,
+          options: meetupSigns.length > 0 ? meetupSigns : base.physicalMeetup.signs.options,
+        },
+        wearablePrompt:
+          getEl("org-meetup-wearable-prompt").value.trim() || base.physicalMeetup.wearablePrompt,
       },
       parameters: {
         onboarding: {
@@ -1365,6 +1570,11 @@ const bindOrganizerPage = () => {
     };
   };
 
+  const refreshJsonFromSettings = (settings) => {
+    if (!(jsonArea instanceof HTMLTextAreaElement)) return;
+    jsonArea.value = JSON.stringify(settings, null, 2);
+  };
+
   let lastLoaded = null;
 
   const load = async () => {
@@ -1372,6 +1582,7 @@ const bindOrganizerPage = () => {
       const payload = await apiFetch("/api/organizer/settings", { method: "GET" });
       lastLoaded = payload.settings;
       applyToForm(lastLoaded);
+      refreshJsonFromSettings(lastLoaded);
       setStatus("Settings loaded.", "success");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Failed to load settings.", "error");
@@ -1379,6 +1590,29 @@ const bindOrganizerPage = () => {
   };
 
   if (reloadBtn) reloadBtn.addEventListener("click", () => load());
+
+  if (jsonRefreshBtn) {
+    jsonRefreshBtn.addEventListener("click", () => {
+      const settings = collectFromForm(lastLoaded || defaultOrganizerSettingsShape());
+      refreshJsonFromSettings(settings);
+      setStatus("JSON refreshed from current form values.", "success");
+    });
+  }
+
+  if (jsonApplyBtn && jsonArea instanceof HTMLTextAreaElement) {
+    jsonApplyBtn.addEventListener("click", () => {
+      try {
+        const parsed = JSON.parse(jsonArea.value || "{}");
+        const merged = deepMerge(defaultOrganizerSettingsShape(), parsed || {});
+        lastLoaded = merged;
+        applyToForm(merged);
+        refreshJsonFromSettings(merged);
+        setStatus("JSON applied to form.", "success");
+      } catch (_error) {
+        setStatus("Invalid JSON. Please fix formatting and try again.", "error");
+      }
+    });
+  }
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -1390,12 +1624,14 @@ const bindOrganizerPage = () => {
       });
       lastLoaded = result.settings;
       applyToForm(lastLoaded);
+      refreshJsonFromSettings(lastLoaded);
       setStatus("Event settings saved.", "success");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Save failed.", "error");
     }
   });
 
+  bindSectionNav();
   load();
 };
 

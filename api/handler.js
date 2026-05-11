@@ -35,6 +35,7 @@ if (!globalThis.__nexusStore) {
     onboardingDrafts: new Map(),
     actions: new Map(),
     wavesByEvent: new Map(),
+    meetupPreferences: new Map(),
   };
 }
 
@@ -84,6 +85,15 @@ const buildDefaultOrganizerSettings = () => ({
       "hot_takes",
     ],
     crowdCues: "",
+  },
+  physicalMeetup: {
+    enabled: true,
+    spaces: ["Main Hall North", "Coffee Bar", "Side Lounge"],
+    signs: {
+      enabled: true,
+      options: ["Red flag", "Blue flag", "Yellow flag"],
+    },
+    wearablePrompt: "What are you wearing so your match can spot you quickly?",
   },
   parameters: {
     onboarding: {
@@ -212,6 +222,21 @@ const validateOrganizerSettings = (settings) => {
     !settings.freebies.links.every((entry) => typeof entry === "string")
   ) {
     return "freebies.links must be an array of strings.";
+  }
+  const meetup = settings.physicalMeetup || {};
+  if (!Array.isArray(meetup.spaces) || meetup.spaces.length < 1) {
+    return "physicalMeetup.spaces must include at least one space.";
+  }
+  if (!meetup.spaces.every((entry) => typeof entry === "string" && entry.trim().length > 0)) {
+    return "physicalMeetup.spaces must contain non-empty strings.";
+  }
+  if (meetup.signs?.enabled) {
+    if (!Array.isArray(meetup.signs.options) || meetup.signs.options.length < 1) {
+      return "physicalMeetup.signs.options must include at least one sign when signs are enabled.";
+    }
+    if (!meetup.signs.options.every((entry) => typeof entry === "string" && entry.trim().length > 0)) {
+      return "physicalMeetup.signs.options must contain non-empty strings when signs are enabled.";
+    }
   }
   return null;
 };
@@ -355,6 +380,47 @@ const readJsonBody = async (req) => {
 
 const getUserId = (req, body) =>
   req.headers["x-user-id"] || body.userId || body.id || null;
+
+const stableHash = (value) => {
+  const input = String(value || "");
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+
+const getMeetupConfig = () => globalThis.__organizerSettings?.physicalMeetup || {};
+
+const normalizedPairKey = (left, right) => [String(left || ""), String(right || "")].sort().join("::");
+
+const buildPairMeetupPlan = (userId, targetUserId) => {
+  const meetupConfig = getMeetupConfig();
+  const spaces = Array.isArray(meetupConfig.spaces)
+    ? meetupConfig.spaces.filter((entry) => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+  const signs = Array.isArray(meetupConfig.signs?.options)
+    ? meetupConfig.signs.options.filter((entry) => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+  const signsEnabled = Boolean(meetupConfig.signs?.enabled) && signs.length > 0;
+  const pairKey = normalizedPairKey(userId, targetUserId);
+  const hash = stableHash(pairKey);
+  const space = spaces.length > 0 ? spaces[hash % spaces.length].trim() : "Main Hall";
+  const sign = signsEnabled ? signs[hash % signs.length].trim() : null;
+  const requiresWearableMarker = !signsEnabled;
+  return {
+    pairKey,
+    space,
+    sign,
+    signsEnabled,
+    requiresWearableMarker,
+    wearablePrompt:
+      typeof meetupConfig.wearablePrompt === "string" && meetupConfig.wearablePrompt.trim().length > 0
+        ? meetupConfig.wearablePrompt.trim()
+        : "What are you wearing so your match can spot you quickly?",
+  };
+};
 
 const ensureDraft = (userId) => {
   const current = store.onboardingDrafts.get(userId) || {};
@@ -839,6 +905,72 @@ module.exports = async (req, res) => {
           action: body.action,
         },
         mutualMatch,
+      });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/meetup/preferences") {
+      const userId = getUserId(req, body);
+      if (!isNonEmptyString(userId) || !store.profiles.has(userId)) {
+        sendJson(res, 400, {
+          ok: false,
+          error: "Known userId with completed onboarding is required.",
+        });
+        return;
+      }
+      const wearableMarker = isNonEmptyString(body.wearableMarker) ? body.wearableMarker.trim() : "";
+      if (!wearableMarker) {
+        sendJson(res, 400, {
+          ok: false,
+          error: "wearableMarker is required.",
+        });
+        return;
+      }
+      store.meetupPreferences.set(userId, {
+        wearableMarker,
+        updatedAt: new Date().toISOString(),
+      });
+      sendJson(res, 200, {
+        ok: true,
+        userId,
+        wearableMarker,
+      });
+      return;
+    }
+
+    if (req.method === "GET" && path === "/meetup/plan") {
+      const userId = req.headers["x-user-id"] || req.query.userId;
+      const targetUserId = req.query.targetUserId;
+      if (!isNonEmptyString(userId) || !store.profiles.has(userId)) {
+        sendJson(res, 400, {
+          ok: false,
+          error: "Known userId with completed onboarding is required.",
+        });
+        return;
+      }
+      if (!isNonEmptyString(targetUserId)) {
+        sendJson(res, 400, {
+          ok: false,
+          error: "targetUserId is required.",
+        });
+        return;
+      }
+      const plan = buildPairMeetupPlan(userId, targetUserId);
+      const selfPreference = store.meetupPreferences.get(userId) || null;
+      sendJson(res, 200, {
+        ok: true,
+        targetUserId,
+        meetup: {
+          pairKey: plan.pairKey,
+          space: plan.space,
+          sign: plan.sign,
+          requiresWearableMarker: plan.requiresWearableMarker,
+          wearablePrompt: plan.wearablePrompt,
+          yourWearableMarker: selfPreference?.wearableMarker || "",
+          instructionsForUser: plan.sign
+            ? `Meet at ${plan.space}. Look for the ${plan.sign}.`
+            : `Meet at ${plan.space}. Share what you are wearing so your match can spot you.`,
+        },
       });
       return;
     }

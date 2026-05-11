@@ -113,6 +113,26 @@ export interface OwnerEventOverview {
   pendingMatches: number;
 }
 
+export interface PhysicalMeetupSettings {
+  enabled: boolean;
+  spaces: string[];
+  signs: {
+    enabled: boolean;
+    options: string[];
+  };
+  wearablePrompt: string;
+}
+
+export interface MeetupPlan {
+  pairKey: string;
+  space: string;
+  sign: string | null;
+  requiresWearableMarker: boolean;
+  wearablePrompt: string;
+  yourWearableMarker: string;
+  instructionsForUser: string;
+}
+
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
