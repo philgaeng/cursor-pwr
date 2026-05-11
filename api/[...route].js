@@ -1,4 +1,6 @@
 const { randomUUID } = require("node:crypto");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const DEMO_MODE_ENABLED = process.env.DEMO_MODE_ENABLED !== "false";
 const EVENT_ID = "demo-event-2026";
@@ -37,6 +39,200 @@ if (!globalThis.__nexusStore) {
 }
 
 const store = globalThis.__nexusStore;
+
+const buildDefaultOrganizerSettings = () => ({
+  organizer: {
+    creds: {
+      email: "organizer@example.com",
+      google: {
+        enabled: false,
+        clientEmail: "",
+        privateKey: "",
+        spreadsheetId: "",
+        folderPath: "",
+      },
+    },
+    socialMedia: {
+      instagram: "",
+      whatsapp: "",
+      linkedin: "",
+    },
+  },
+  eventInfo: {
+    id: EVENT_ID,
+    name: "NexusLink Event",
+    description: "",
+    outroMessage: "",
+  },
+  freebies: {
+    enabled: false,
+    links: [],
+  },
+  attendance: {
+    expectedSize: 80,
+    crowdDescription: "",
+  },
+  questionRoutes: {
+    suggestions: [
+      "food",
+      "sweets",
+      "family_life",
+      "travel",
+      "entertainment",
+      "work_style",
+      "hobbies",
+      "hot_takes",
+    ],
+    crowdCues: "",
+  },
+  parameters: {
+    onboarding: {
+      requiredOfferTags: 1,
+      requiredSeekTags: 1,
+      requiredIcebreakerAnswers: 3,
+      requiredAssignedRoutesPerParticipant: 3,
+      onboardingResumeTimeoutSeconds: 180,
+    },
+    matching: {
+      roomSizeStrictModeThreshold: 100,
+      strictCoverageTargetPercent: 100,
+      relaxedCoverageTargetPercent: 92,
+      waveIntervalMinutes: 15,
+      waveSizeLimit: 5,
+      targetSuggestionsPerUser: 5,
+      diversity: {
+        minDominantRoutes: 3,
+        maxSuggestionsPerDominantRoute: 2,
+      },
+      repeatPolicy: {
+        allowAcrossWaves: true,
+        cooldownWaves: 2,
+      },
+      scoring: {
+        weights: {
+          tier1: 3,
+          tier2: 2,
+          tier3: 2,
+          rarityBonus: 5,
+          freeTextSemanticBonus: 5,
+        },
+        startScoringMinParticipants: 40,
+        minMatchFloorStrategy: "distribution_floor_lowest_second_highest_score",
+        lowConfidenceHandling: {
+          showFewerByDefault: true,
+          labelWhenShown: true,
+        },
+      },
+    },
+    privacy: {
+      requireDoubleOptIn: true,
+      primaryRevealChannel: "whatsapp",
+      autoDeleteDefaultHoursAfterEvent: 24,
+      requireConsentAuditTrail: true,
+    },
+  },
+});
+
+if (!globalThis.__organizerSettings) {
+  globalThis.__organizerSettings = buildDefaultOrganizerSettings();
+}
+
+const mergeObjects = (base, override) => {
+  if (Array.isArray(base) && Array.isArray(override)) {
+    return override;
+  }
+  if (
+    !base ||
+    !override ||
+    typeof base !== "object" ||
+    typeof override !== "object" ||
+    Array.isArray(base) ||
+    Array.isArray(override)
+  ) {
+    return override;
+  }
+
+  const merged = { ...base };
+  Object.keys(override).forEach((key) => {
+    const baseValue = base[key];
+    const overrideValue = override[key];
+    if (overrideValue === undefined) {
+      return;
+    }
+    if (
+      baseValue &&
+      overrideValue &&
+      typeof baseValue === "object" &&
+      typeof overrideValue === "object" &&
+      !Array.isArray(baseValue) &&
+      !Array.isArray(overrideValue)
+    ) {
+      merged[key] = mergeObjects(baseValue, overrideValue);
+      return;
+    }
+    merged[key] = overrideValue;
+  });
+  return merged;
+};
+
+const isPositiveInteger = (value) => Number.isInteger(value) && value > 0;
+
+const isEmail = (value) =>
+  typeof value === "string" && value.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
+const validateOrganizerSettings = (settings) => {
+  if (!settings || typeof settings !== "object") {
+    return "settings payload must be an object.";
+  }
+
+  if (!isEmail(settings.organizer?.creds?.email)) {
+    return "organizer.creds.email must be a valid email.";
+  }
+  if (!(typeof settings.eventInfo?.name === "string" && settings.eventInfo.name.trim().length > 0)) {
+    return "eventInfo.name is required.";
+  }
+  if (
+    !Array.isArray(settings.questionRoutes?.suggestions) ||
+    settings.questionRoutes.suggestions.length !== 8 ||
+    !settings.questionRoutes.suggestions.every((entry) => typeof entry === "string" && entry.trim().length > 0)
+  ) {
+    return "questionRoutes.suggestions must contain exactly 8 non-empty strings.";
+  }
+  if (
+    !isPositiveInteger(settings.parameters?.matching?.waveIntervalMinutes) ||
+    !isPositiveInteger(settings.parameters?.matching?.waveSizeLimit)
+  ) {
+    return "matching wave interval and wave size must be positive integers.";
+  }
+  if (!isPositiveInteger(settings.attendance?.expectedSize)) {
+    return "attendance.expectedSize must be a positive integer.";
+  }
+  if (
+    !Array.isArray(settings.freebies?.links) ||
+    !settings.freebies.links.every((entry) => typeof entry === "string")
+  ) {
+    return "freebies.links must be an array of strings.";
+  }
+  return null;
+};
+
+const getRouteCatalog = () => {
+  if (globalThis.__routeCatalog) {
+    return globalThis.__routeCatalog;
+  }
+  if (globalThis.__routeCatalogFailed) {
+    return null;
+  }
+  try {
+    const filePath = path.join(__dirname, "..", "docs", "resource", "icebreaker-routes.v1.json");
+    const raw = fs.readFileSync(filePath, "utf8");
+    globalThis.__routeCatalog = JSON.parse(raw);
+  } catch (_error) {
+    globalThis.__routeCatalogFailed = true;
+    return null;
+  }
+  return globalThis.__routeCatalog;
+};
 
 const sendJson = (res, statusCode, payload) => {
   res.status(statusCode).json(payload);
@@ -183,6 +379,39 @@ module.exports = (req, res) => {
 
     if (req.method === "GET" && path === "/tags/catalog") {
       sendJson(res, 200, { ok: true, eventId: EVENT_ID, tags: GLOBAL_TAG_CATALOG });
+      return;
+    }
+
+    if (req.method === "GET" && path === "/routes/catalog") {
+      const catalog = getRouteCatalog();
+      if (!catalog) {
+        sendJson(res, 500, { ok: false, error: "Route catalog is unavailable." });
+        return;
+      }
+      sendJson(res, 200, catalog);
+      return;
+    }
+
+    if (req.method === "GET" && path === "/organizer/settings") {
+      sendJson(res, 200, {
+        ok: true,
+        eventId: EVENT_ID,
+        settings: globalThis.__organizerSettings,
+      });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/organizer/settings") {
+      const incomingSettings =
+        body && typeof body === "object" && body.settings ? body.settings : body;
+      const nextSettings = mergeObjects(globalThis.__organizerSettings, incomingSettings);
+      const validationError = validateOrganizerSettings(nextSettings);
+      if (validationError) {
+        sendJson(res, 400, { ok: false, error: validationError });
+        return;
+      }
+      globalThis.__organizerSettings = nextSettings;
+      sendJson(res, 200, { ok: true, eventId: EVENT_ID, settings: globalThis.__organizerSettings });
       return;
     }
 

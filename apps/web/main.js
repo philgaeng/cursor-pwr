@@ -1,6 +1,17 @@
 const REQUIRED_ASSIGNED_ROUTES = 3;
 
-const API_BASE_URL = (window.API_BASE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
+const resolveApiBaseUrl = () => {
+  if (window.API_BASE_URL !== undefined && window.API_BASE_URL !== null) {
+    return String(window.API_BASE_URL).replace(/\/$/, "");
+  }
+  const host = window.location.hostname;
+  if (host === "localhost" || host === "127.0.0.1") {
+    return "http://127.0.0.1:8787".replace(/\/$/, "");
+  }
+  return "";
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
 const STORAGE_KEY = "nexuslink-web-state-v2";
 const OFFER_TAG_OPTIONS = [
   "AI Product Strategy",
