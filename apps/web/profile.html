@@ -16,7 +16,12 @@
       <section class="glass-card">
         <div class="step-pill">Step 2 of 6</div>
         <p class="flow-hint">01_auth -> 02_details_gathering -> 03_icebreaker_questions -> done</p>
+        <p id="demo-auth-banner" class="qr-context" hidden></p>
         <form id="profile-form" class="stack">
+          <label>LinkedIn URL (optional)
+            <input id="linkedin-url" type="url" placeholder="https://www.linkedin.com/in/your-handle" />
+          </label>
+          <button type="button" id="linkedin-prefill-btn" class="ghost-btn">Use LinkedIn URL to prefill</button>
           <label>Full Name <input id="full-name" required placeholder="Alex Rivera" /></label>
           <label>Role <input id="role" required placeholder="Founder" /></label>
           <label>Company <input id="company" required placeholder="Nexus Labs" /></label>

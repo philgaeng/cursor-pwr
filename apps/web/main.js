@@ -424,10 +424,33 @@ const bindProfilePage = () => {
   const form = document.getElementById("profile-form");
   const offerContainer = document.getElementById("offer-tag-options");
   const seekContainer = document.getElementById("seek-tag-options");
+  const demoBanner = document.getElementById("demo-auth-banner");
+  const linkedinUrlInput = document.getElementById("linkedin-url");
+  const linkedinPrefillBtn = document.getElementById("linkedin-prefill-btn");
   if (!form) return;
+
+  if (demoBanner) {
+    const p = state.auth?.provider;
+    const demo = Boolean(state.auth?.demoMode) && (p === "linkedin" || p === "google");
+    demoBanner.hidden = !demo;
+    demoBanner.textContent = demo
+      ? `Demo ${p === "linkedin" ? "LinkedIn" : "Google"} sign-in: this build does not read your ${p === "linkedin" ? "LinkedIn" : "Google"} profile yet. Fill in your real details below, then continue.`
+      : "";
+  }
 
   let selectedOffers = [];
   let selectedSeeks = [];
+
+  const applyLinkedInPrefill = (prefill) => {
+    if (!prefill || typeof prefill !== "object") return;
+    const fullNameEl = document.getElementById("full-name");
+    const roleEl = document.getElementById("role");
+    const companyEl = document.getElementById("company");
+    if (linkedinUrlInput && prefill.linkedinUrl) linkedinUrlInput.value = prefill.linkedinUrl;
+    if (prefill.fullName && !fullNameEl.value.trim()) fullNameEl.value = prefill.fullName;
+    if (prefill.role && !roleEl.value.trim()) roleEl.value = prefill.role;
+    if (prefill.company && !companyEl.value.trim()) companyEl.value = prefill.company;
+  };
 
   const createTagButton = (tag, type) => {
     const button = document.createElement("button");
@@ -492,6 +515,7 @@ const bindProfilePage = () => {
   }
 
   if (state.profile) {
+    if (linkedinUrlInput) linkedinUrlInput.value = state.profile.linkedinUrl || "";
     document.getElementById("full-name").value = state.profile.fullName || "";
     document.getElementById("role").value = state.profile.role || "";
     document.getElementById("company").value = state.profile.company || "";
@@ -500,6 +524,30 @@ const bindProfilePage = () => {
     selectedOffers = Array.isArray(state.profile.offers) ? state.profile.offers : [];
     selectedSeeks = Array.isArray(state.profile.seeks) ? state.profile.seeks : [];
     renderTagSelection();
+  }
+
+  if (linkedinPrefillBtn && linkedinUrlInput) {
+    linkedinPrefillBtn.addEventListener("click", async () => {
+      const linkedinUrl = linkedinUrlInput.value.trim();
+      if (!linkedinUrl) {
+        setStatus("Enter a LinkedIn URL to prefill.", "error");
+        return;
+      }
+      linkedinPrefillBtn.disabled = true;
+      setStatus("Parsing LinkedIn URL...", "info");
+      try {
+        const result = await apiFetch("/api/profile/enrich-linkedin", {
+          method: "POST",
+          body: JSON.stringify({ linkedinUrl }),
+        });
+        applyLinkedInPrefill(result.prefill || {});
+        setStatus("LinkedIn URL parsed. Please review and edit details.", "success");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "LinkedIn prefill failed.", "error");
+      } finally {
+        linkedinPrefillBtn.disabled = false;
+      }
+    });
   }
 
   if (selectedOffers.length === 0 && selectedSeeks.length === 0) {
@@ -519,6 +567,7 @@ const bindProfilePage = () => {
     }
     const profile = {
       userId: state.userId,
+      linkedinUrl: linkedinUrlInput ? linkedinUrlInput.value.trim() : "",
       fullName: document.getElementById("full-name").value.trim(),
       name: document.getElementById("full-name").value.trim(),
       role: document.getElementById("role").value.trim(),

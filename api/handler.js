@@ -258,6 +258,36 @@ const getRequiredTagMinimums = () => {
   return { offers, seeks };
 };
 
+const parseLinkedInPublicUrl = (rawUrl) => {
+  if (!isNonEmptyString(rawUrl)) return null;
+  let urlObj;
+  try {
+    urlObj = new URL(rawUrl.trim());
+  } catch (_error) {
+    return null;
+  }
+  const host = String(urlObj.hostname || "").toLowerCase();
+  if (!host.includes("linkedin.com")) return null;
+  const parts = String(urlObj.pathname || "")
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length < 2 || parts[0] !== "in") return null;
+  const handle = parts[1];
+  if (!handle) return null;
+  const fullName = handle
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+  return {
+    linkedinUrl: `https://www.linkedin.com/in/${handle}/`,
+    fullName,
+    role: "",
+    company: "",
+  };
+};
+
 const isIcebreakerResponses = (value) =>
   Array.isArray(value) &&
   value.length >= 3 &&
@@ -455,6 +485,25 @@ module.exports = async (req, res) => {
       return;
     }
 
+    if (req.method === "POST" && path === "/profile/enrich-linkedin") {
+      const parsed = parseLinkedInPublicUrl(body.linkedinUrl);
+      if (!parsed) {
+        sendJson(res, 400, {
+          ok: false,
+          error:
+            "Please provide a valid public LinkedIn URL (for example: https://www.linkedin.com/in/your-handle/).",
+        });
+        return;
+      }
+      sendJson(res, 200, {
+        ok: true,
+        source: "linkedin_url",
+        prefill: parsed,
+        note: "MVP uses URL parsing only. Please review and edit all profile fields.",
+      });
+      return;
+    }
+
     if (req.method === "GET" && path === "/routes/catalog") {
       const catalog = getRouteCatalog();
       if (!catalog) {
@@ -498,23 +547,22 @@ module.exports = async (req, res) => {
         });
         return;
       }
-      /** MVP: both providers return a stub session only (no real OAuth on this endpoint). */
+      /** MVP: stub session only — no LinkedIn/Google OAuth on this endpoint. Client collects real identity on the profile step. */
       const userId = body.userId || randomUUID();
       store.sessions.set(userId, {
         provider,
         demoMode: Boolean(body.demoMode),
         createdAt: new Date().toISOString(),
       });
-      const profileName = provider === "linkedin" ? "LinkedIn Attendee" : "Google Attendee";
       sendJson(res, 200, {
         ok: true,
         userId,
         provider,
         demoMode: Boolean(body.demoMode),
         profile: {
-          name: profileName,
-          email: `${provider}.${String(userId).slice(0, 8)}@nexuslink.local`,
-          picture: `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(profileName)}`,
+          name: "",
+          email: "",
+          picture: "",
         },
       });
       return;
@@ -614,6 +662,7 @@ module.exports = async (req, res) => {
       const draft = ensureDraft(userId);
       draft.profile = {
         id: userId,
+        linkedinUrl: isNonEmptyString(body.linkedinUrl) ? body.linkedinUrl.trim() : undefined,
         name: body.name || body.fullName || "Anonymous Attendee",
         role: body.role.trim(),
         company: body.company.trim(),
@@ -695,6 +744,7 @@ module.exports = async (req, res) => {
       }
       const profile = {
         id: userId,
+        linkedinUrl: body.linkedinUrl || draft.profile?.linkedinUrl,
         name:
           body.name || body.fullName || draft.profile?.name || "Anonymous Attendee",
         role: body.role || draft.profile?.role || "Attendee",
