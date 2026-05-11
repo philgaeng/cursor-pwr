@@ -26,10 +26,10 @@ Execution checklist for turning `docs/feature.md` into a demo-ready MVP and prod
 - [ ] Define `LikeAction` type (`like`/`pass`) and `MutualMatch` result payload.
 - [ ] Add runtime schema validation for all inbound/outbound API payloads.
 
-### Backend/API (`apps/api/`)
+### Backend/API (`api/handler.js` on Vercel)
 
 - [ ] Add onboarding endpoint:
-  - validates exactly 3 offer tags + 3 seek tags
+  - validates minimum offer/seek tags per organizer settings (default: at least 1 each; aligns with web)
   - validates consent accepted
   - validates at least 3 answered icebreaker questions
 - [ ] Add Google OAuth session path (MVP default auth path).

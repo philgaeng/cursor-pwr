@@ -173,6 +173,152 @@ button,
   margin: 0;
 }
 
+.icebreaker-card {
+  display: grid;
+  gap: 12px;
+}
+
+.icebreaker-route-title {
+  margin: 0;
+  font-size: 20px;
+  color: #1e1b4b;
+}
+
+.icebreaker-prompt {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #334155;
+  line-height: 1.35;
+}
+
+.icebreaker-stage {
+  min-height: 120px;
+}
+
+.icebreaker-nav {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.icebreaker-nav .ghost-btn {
+  width: auto;
+  min-width: 120px;
+  padding: 10px 16px;
+}
+
+.ice-tile-grid {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.ice-tile-grid--four {
+  grid-template-columns: 1fr 1fr;
+}
+
+.ice-tile-grid--two {
+  grid-template-columns: 1fr 1fr;
+}
+
+.ice-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  border: none;
+  border-radius: 18px;
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  background: transparent;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.12);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.ice-tile:focus-visible {
+  outline: 3px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.ice-tile:active {
+  transform: scale(0.98);
+}
+
+.ice-tile:hover {
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+}
+
+.ice-tile__visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  width: 100%;
+}
+
+.ice-tile-grid--two .ice-tile__visual {
+  min-height: 120px;
+}
+
+.ice-tile__emoji {
+  font-size: 40px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
+}
+
+.ice-tile__label {
+  display: block;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  background: #fff;
+  border-top: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.ice-free-wrap {
+  display: grid;
+  gap: 12px;
+}
+
+.ice-free-text {
+  width: 100%;
+  border-radius: 14px;
+  padding: 12px;
+  font-size: 15px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 100px;
+}
+
+.ice-primary-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.ice-primary-actions button {
+  width: 100%;
+}
+
+@media (max-width: 380px) {
+  .ice-tile__visual {
+    min-height: 84px;
+  }
+
+  .ice-tile-grid--two .ice-tile__visual {
+    min-height: 108px;
+  }
+
+  .ice-tile__emoji {
+    font-size: 34px;
+  }
+}
+
 .question-list,
 .candidate-list,
 .vault-list {

@@ -1,19 +1,18 @@
 # Organizer Event Settings
 
-This folder contains backend-configurable event settings for organizer controls.
+This folder is a **reference copy** of organizer settings shape. The live MVP API is **`api/handler.js`** on Vercel (in-memory defaults + `POST /api/organizer/settings`); there is no separate long-lived server reading this file.
 
-- File: `apps/api/settings/event-settings.json`
+- Reference file: `apps/api/settings/event-settings.json`
 - Read API: `GET /api/organizer/settings`
 - Update API: `POST /api/organizer/settings`
 
 ## How to edit
 
-1. Update `event-settings.json` directly, or send a partial JSON payload to `POST /api/organizer/settings`.
+1. Prefer `POST /api/organizer/settings` (e.g. from the organizer page on your **Vercel Preview or Production** URL, or optionally while running `npx vercel dev`).
 2. Keep required fields valid:
    - `organizer.creds.email` must be a valid email.
    - `questionRoutes.suggestions` must have exactly 8 non-empty strings.
    - `attendance.expectedSize`, `parameters.matching.waveIntervalMinutes`, and `parameters.matching.waveSizeLimit` must be positive integers.
-3. Restart the API if you edited the JSON file directly while the server was not running.
 
 ## Structure summary
 

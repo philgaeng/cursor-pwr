@@ -13,12 +13,14 @@
         <h1>Icebreaker Questions</h1>
         <p class="subtitle">Complete your assigned routes to power high-quality matching.</p>
       </header>
-      <section class="glass-card">
-        <div class="step-pill">Step 3 of 6</div>
-        <form id="questionnaire-form" class="stack">
-          <div id="question-list" class="question-list"></div>
-          <button type="submit">Save Route Answers</button>
-        </form>
+      <section class="glass-card icebreaker-card">
+        <div class="step-pill" id="icebreaker-step-pill">Route 1 of 3 · Step 1 of 5</div>
+        <h2 class="icebreaker-route-title" id="icebreaker-route-title"></h2>
+        <p class="icebreaker-prompt" id="icebreaker-prompt"></p>
+        <div id="icebreaker-stage" class="icebreaker-stage" aria-live="polite"></div>
+        <div class="icebreaker-nav">
+          <button type="button" class="ghost-btn" id="icebreaker-back" hidden>Back</button>
+        </div>
       </section>
     </main>
     <footer class="status-bar">

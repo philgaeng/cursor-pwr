@@ -241,10 +241,16 @@ const sendJson = (res, statusCode, payload) => {
 const isNonEmptyString = (value) =>
   typeof value === "string" && value.trim().length > 0;
 
-const isTripleTags = (value) =>
+const hasMinimumTags = (value, min) =>
   Array.isArray(value) &&
-  value.length === 3 &&
-  value.every((item) => isNonEmptyString(item));
+  value.filter((item) => isNonEmptyString(item)).length >= min;
+
+const getRequiredTagMinimums = () => {
+  const onb = globalThis.__organizerSettings?.parameters?.onboarding || {};
+  const offers = isPositiveInteger(onb.requiredOfferTags) ? onb.requiredOfferTags : 1;
+  const seeks = isPositiveInteger(onb.requiredSeekTags) ? onb.requiredSeekTags : 1;
+  return { offers, seeks };
+};
 
 const isIcebreakerResponses = (value) =>
   Array.isArray(value) &&
@@ -464,7 +470,69 @@ module.exports = (req, res) => {
         demoMode: Boolean(body.demoMode),
         createdAt: new Date().toISOString(),
       });
-      sendJson(res, 200, { ok: true, userId, provider, demoMode: Boolean(body.demoMode) });
+      const profileName = provider === "linkedin" ? "LinkedIn Attendee" : "Google Attendee";
+      sendJson(res, 200, {
+        ok: true,
+        userId,
+        provider,
+        demoMode: Boolean(body.demoMode),
+        profile: {
+          name: profileName,
+          email: `${provider}.${String(userId).slice(0, 8)}@nexuslink.local`,
+          picture: `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(profileName)}`,
+        },
+      });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/auth/manual-bootstrap") {
+      if (!isNonEmptyString(body.name)) {
+        sendJson(res, 400, { ok: false, error: "Manual bootstrap requires name." });
+        return;
+      }
+      if (!isNonEmptyString(body.company)) {
+        sendJson(res, 400, { ok: false, error: "Manual bootstrap requires company." });
+        return;
+      }
+      if (!isNonEmptyString(body.role)) {
+        sendJson(res, 400, { ok: false, error: "Manual bootstrap requires role." });
+        return;
+      }
+      if (!isEmail(body.email)) {
+        sendJson(res, 400, { ok: false, error: "Manual bootstrap requires a valid email." });
+        return;
+      }
+      if (!isNonEmptyString(body.phone)) {
+        sendJson(res, 400, { ok: false, error: "Manual bootstrap requires phone." });
+        return;
+      }
+      const userId = body.userId || randomUUID();
+      const draft = ensureDraft(userId);
+      draft.profile = {
+        id: userId,
+        name: body.name.trim(),
+        role: body.role.trim(),
+        company: body.company.trim(),
+        email: body.email.trim(),
+        whatsapp: body.phone.trim(),
+      };
+      store.sessions.set(userId, {
+        provider: "manual",
+        demoMode: true,
+        createdAt: new Date().toISOString(),
+      });
+      sendJson(res, 200, {
+        ok: true,
+        userId,
+        provider: "manual",
+        profile: {
+          name: draft.profile.name,
+          role: draft.profile.role,
+          company: draft.profile.company,
+          email: draft.profile.email,
+          phone: draft.profile.whatsapp,
+        },
+      });
       return;
     }
 
@@ -496,10 +564,11 @@ module.exports = (req, res) => {
       }
       const offers = body.offers || body.whatIOffer;
       const seeks = body.seeks || body.whatISeek;
-      if (!isTripleTags(offers) || !isTripleTags(seeks)) {
+      const { offers: minOffers, seeks: minSeeks } = getRequiredTagMinimums();
+      if (!hasMinimumTags(offers, minOffers) || !hasMinimumTags(seeks, minSeeks)) {
         sendJson(res, 400, {
           ok: false,
-          error: "Profile requires exactly 3 offer tags and exactly 3 seek tags.",
+          error: `Profile requires at least ${minOffers} offer tag(s) and at least ${minSeeks} seek tag(s).`,
         });
         return;
       }
@@ -567,10 +636,11 @@ module.exports = (req, res) => {
           : typeof body.autoDeleteAfter24h === "boolean"
             ? body.autoDeleteAfter24h
             : true;
-      if (!isTripleTags(offers) || !isTripleTags(seeks)) {
+      const { offers: minOffers, seeks: minSeeks } = getRequiredTagMinimums();
+      if (!hasMinimumTags(offers, minOffers) || !hasMinimumTags(seeks, minSeeks)) {
         sendJson(res, 400, {
           ok: false,
-          error: "Onboarding requires exactly 3 offers and exactly 3 seeks.",
+          error: `Onboarding requires at least ${minOffers} offer tag(s) and at least ${minSeeks} seek tag(s).`,
         });
         return;
       }

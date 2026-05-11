@@ -24,7 +24,7 @@ Date: 2026-05-08
 
 - **Web client does not pass `userId` (or `X-User-Id`) from `/api/auth/session` into later requests.**
   - Impact: End-to-end flow against live backend can fail with `400` on onboarding/waves/actions.
-  - Components: `apps/web`, `apps/api`.
+  - Components: `apps/web`, `api/handler.js`.
   - Repro:
     1. Complete auth step in web UI.
     2. Submit profile/questions/complete onboarding.
@@ -36,7 +36,7 @@ Date: 2026-05-08
 
 - **Wave/candidate payload remains dual-shape during transition.**
   - Impact: Integration fragility if only one contract variant is returned.
-  - Components: `apps/web`, `packages/shared`, `apps/api`.
+  - Components: `apps/web`, `packages/shared`, `api/handler.js`.
   - Repro:
     1. Return only canonical shared shape or only legacy shape.
     2. Confirm adapter behavior works now, but drift risk remains.

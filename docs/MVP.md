@@ -1,111 +1,71 @@
-# MVP Scope
+# MVP Scope (NexusLink)
 
-This file is the live source of truth for MVP scope.
+This file is the live source of truth for MVP scope for **NexusLink**: intent-based networking at live events (onboarding, icebreakers, match waves, privacy-safe intros).
 
-Contract source of truth: `packages/shared/task-contracts.ts` (`CONTRACT_VERSION = "v1"`).
-PR/integration gate checklist: `docs/ACCEPTANCE_CRITERIA.md`.
+Module-level behavior and acceptance criteria live in `docs/features/*.md` and `docs/resource/*`.
 
-## Problem Statement
+PR/integration gate checklist: `docs/ACCEPTANCE_CRITERIA.md` (when present).
 
-Small teams need a simple way to track tasks in one place without complex setup.
-The MVP must let users create, view, update, and complete tasks reliably through a
-single web interface backed by a working API.
+## Runtime and deployment (single path)
 
-## Target Users
+The MVP ships as a **Vercel** project. Do **not** maintain a second local-only API server as the primary backend.
 
-- Small student/project teams (3-10 people)
-- Users who need fast task capture and status tracking
-- Teams working in short cycles and presenting progress demos
+| Layer | Location | Notes |
+|--------|-----------|--------|
+| Static UI | `apps/web/*` | Served via `vercel.json` rewrites to the site root and asset paths. |
+| HTTP API | `api/handler.js` | Single serverless entry; routes are invoked as `/api/...` per `vercel.json`. |
+| Icebreaker catalog | `docs/resource/icebreaker-routes.v1.json` | Bundled with the deployment; read by the handler at runtime. |
 
-## MVP Features (Must Have)
+**Deployment (typical):** connect the Git repo to Vercel and **push branches**; Vercel builds and deploys **Preview** (per branch/PR) and **Production** (your production branch). No Vercel CLI is required for deploy if you use Git sync.
 
-1. Task list page that shows all tasks with status.
-2. Create task flow with required fields:
-   - title (required)
-   - description (optional)
-   - assignee (optional)
-   - due date (optional)
-3. Update task status:
-   - `todo`
-   - `in_progress`
-   - `done`
-4. Edit task details (title/description/assignee/due date).
-5. Delete task.
-6. Basic filtering by status on the web UI.
-7. API + frontend integration using shared contracts in `packages/shared/`.
+**Full-stack local behavior:** the browser must load the app from an origin that serves **`/api/*`** and static pages together (same origin, as in production). Practical options:
 
-## Non-Goals (Out of Scope)
+1. **Use a Vercel Preview or Production URL** after your changes are pushed (matches Git-only workflow).
+2. **Optional:** from the repo root, `npx vercel dev` reproduces routing locally without relying on Git deploy for every edit.
 
-- Authentication/authorization
-- Notifications (email, push, SMS)
-- File attachments
-- Real-time collaboration/websockets
-- Advanced analytics/reporting
+Serving only `apps/web` with a plain static file server **without** one of the above will break API calls, because `main.js` calls relative `/api/...` paths.
 
-## Acceptance Criteria
+**Optional override:** set `window.API_BASE_URL` before `main.js` loads only for advanced debugging (e.g. pointing at another deployment). The default is same-origin (empty base).
 
-- [ ] User can create a task from UI and see it appear immediately in the list.
-- [ ] User can move a task from `todo` to `in_progress` to `done`.
-- [ ] User can edit and delete a task without page-breaking errors.
-- [ ] Status filter works for all three statuses.
-- [ ] Frontend and backend use shared task types from `packages/shared/`.
-- [ ] API returns consistent error shape for invalid input and missing task.
-- [ ] End-to-end happy path is documented and manually testable in under 5 minutes.
-- [ ] MVP is demo-ready locally for all team members.
+## Product goals (MVP)
 
-## Core User Flow (Demo Path)
+1. Event attendee can complete onboarding: auth (or manual bootstrap) → profile (offers/seeks) → icebreaker routes (mobile tile flow per `docs/features/03_icebreaker_questions.md`) → consent → match wave → like/pass → vault state.
+2. Organizer can load/save event settings used by the demo API.
+3. API returns predictable JSON; errors use an `error` string (and `ok: false` where applicable) for client display.
 
-1. Open app and view task list.
-2. Create one new task with title and optional details.
-3. Change status from `todo` -> `in_progress` -> `done`.
-4. Edit the task title.
-5. Filter by `done` and verify the task appears.
-6. Delete the task and verify it is removed.
+## Non-goals (MVP)
 
-## API Contract Expectations (MVP)
+- Multi-region durable persistence on Vercel (in-memory/globalThis store is demo-appropriate; document limits).
+- Separate long-lived Node process as the canonical API (`apps/api/server.js` removed; see `apps/api/README.md`).
+- Full LinkedIn/Google OAuth production hardening (demo/session stubs only unless spec says otherwise).
 
-Minimum endpoints:
+## Acceptance criteria (high level)
 
-- `GET /tasks` - list tasks
-- `POST /tasks` - create task
-- `PATCH /tasks/:id` - update task
-- `DELETE /tasks/:id` - delete task
+- [ ] Deployed Vercel preview or production loads the web shell and successfully calls `/api/routes/catalog` and other onboarding endpoints on the **same origin**.
+- [ ] Full happy path is reproducible on a **Git-built** Preview or Production deployment (or optionally via `npx vercel dev`); no separate ad-hoc API port.
+- [ ] Feature specs in `docs/features/` remain aligned with implemented behavior (update specs first on conflict).
+- [ ] Agents and contributors follow `docs/agent-instructions.md` for ownership and runtime assumptions.
 
-Minimum task shape:
+## API surface (reference)
 
-- `id: string`
-- `title: string`
-- `description?: string`
-- `assignee?: string`
-- `dueDate?: string` (ISO date)
-- `status: "todo" | "in_progress" | "done"`
-- `createdAt: string` (ISO datetime)
-- `updatedAt: string` (ISO datetime)
+All paths are relative to the deployment origin (e.g. `POST /api/auth/session`). Canonical list and payloads should stay aligned with `apps/web/main.js` and `api/handler.js`.
 
-Error response shape:
+Minimum routes used by the current web app:
 
-- `error.code: string`
-- `error.message: string`
-- `error.details?: unknown`
+- `POST /api/auth/session`, `POST /api/auth/manual-bootstrap`, `POST /api/auth/demo-login`
+- `GET /api/routes/catalog`, `GET /api/tags/catalog`
+- `GET /api/organizer/settings`, `POST /api/organizer/settings`
+- `POST /api/onboarding/profile`, `POST /api/onboarding/questions`, `POST /api/onboarding/complete`
+- `GET /api/waves/current`, `POST /api/waves/trigger`, `POST /api/matches/action`
+- `GET /api/health` (via rewrite to handler; health path inside handler is `/health` after strip)
 
-## Milestones and Ownership
+## Ownership (see also `AGENTS.md`)
 
-- **William (Frontend)**
-  - Build task list UI and forms
-  - Implement status filter and task editing interactions
-  - Wire web app to shared contracts
-- **Philippe (Backend)**
-  - Implement task CRUD endpoints
-  - Add validation and consistent error responses
-  - Keep API aligned with shared contracts
-- **Rojel (Integration/QA)**
-  - Finalize shared contract definitions in `packages/shared/`
-  - Verify end-to-end integration and smoke tests
-  - Maintain MVP checklist and demo readiness
+- **William:** `apps/web/`
+- **Philippe:** `api/` (Vercel serverless handler and API behavior)
+- **Rojel:** `packages/shared/`, integration, QA, delivery
 
-## Open Questions
+## Open questions
 
-- Should due date include time or date-only for MVP?
-- Persist data in-memory only or lightweight local DB for demo stability?
-- Do we need pagination, or is full list acceptable for MVP?
-
+- When to introduce a real database and auth provider vs. demo store.
+- Contract formalization: whether to regenerate `packages/shared` types from a single OpenAPI/schema for the handler.

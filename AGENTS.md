@@ -17,7 +17,7 @@ If requirements conflict, update `docs/MVP.md` first, then implement.
 ## 3) Team Ownership
 
 - **William**: `apps/web/` (frontend implementation)
-- **Philippe**: `apps/api/` (backend implementation)
+- **Philippe**: `api/` (Vercel serverless API — `api/handler.js`)
 - **Rojel**: cross-cutting integration, shared contracts, QA, and delivery flow
 
 Agents should prefer tasks within owner boundaries unless explicitly asked to assist across boundaries.
@@ -94,7 +94,7 @@ Use this sequence to avoid integration breakage while still working in parallel:
 Merge gates for every PR:
 
 - Contract compatibility is preserved.
-- Critical path runs locally.
+- Critical path runs on a **Vercel Preview or Production** URL from Git (same-origin web + API), or optionally with `npx vercel dev`.
 - Any contract change includes coordinated frontend + backend updates.
 
 Cadence rules:

@@ -1,12 +1,10 @@
 const REQUIRED_ASSIGNED_ROUTES = 3;
 
+/** Same-origin `/api` (Vercel or `vercel dev`). Override with window.API_BASE_URL only for debugging. */
 const resolveApiBaseUrl = () => {
   if (window.API_BASE_URL !== undefined && window.API_BASE_URL !== null) {
-    return String(window.API_BASE_URL).replace(/\/$/, "");
-  }
-  const host = window.location.hostname;
-  if (host === "localhost" || host === "127.0.0.1") {
-    return "http://127.0.0.1:8787".replace(/\/$/, "");
+    const raw = String(window.API_BASE_URL).trim();
+    if (raw !== "") return raw.replace(/\/$/, "");
   }
   return "";
 };
@@ -37,6 +35,7 @@ const defaultState = {
   profile: null,
   answers: [],
   icebreakerResponses: [],
+  icebreakerDraft: null,
   assignedRouteIds: [],
   routeCatalogVersion: null,
   consent: null,
@@ -140,86 +139,74 @@ const apiFetch = async (path, options = {}) => {
   return response.json();
 };
 
-const renderRouteBuilder = (container, route, existing = null) => {
-  const card = document.createElement("div");
-  card.className = "question-row";
-  card.dataset.routeId = route.routeId;
-  card.innerHTML = `
-    <h3>${route.title}</h3>
-    <label>${route.tier1Prompt}
-      <select data-field="tier1">
-        <option value="">Select an option</option>
-        ${route.tier1Options
-          .map((opt) => `<option value="${opt.code}">${opt.label}</option>`)
-          .join("")}
-      </select>
-    </label>
-    <div data-slot="tier2"></div>
-    <div data-slot="tier3"></div>
-    <label data-slot="freeText"><span data-field="freeTextLabel">${route.freeTextPrompt || "Optional: share one specific example"}</span>
-      <input data-field="freeText" placeholder="Optional free text" />
-    </label>
-  `;
-  container.appendChild(card);
+const TIER1_TILE_CAP = 4;
+const ROUTE_STEPS = 5;
+const ICE_EMOJI_DECK = ["🎯", "✨", "🌟", "🔥", "💫", "🎨", "🎪", "🚀", "🌈", "⚡"];
 
-  const tier1Select = card.querySelector("select[data-field='tier1']");
-  const tier2Slot = card.querySelector("[data-slot='tier2']");
-  const tier3Slot = card.querySelector("[data-slot='tier3']");
-  const freeTextInput = card.querySelector("input[data-field='freeText']");
-
-  const renderTier2 = () => {
-    tier2Slot.innerHTML = "";
-    tier3Slot.innerHTML = "";
-    const tier1Value = tier1Select.value;
-    if (!tier1Value) return;
-    const tier1Option = route.tier1Options.find((opt) => opt.code === tier1Value);
-    if (!tier1Option) return;
-    const label = document.createElement("label");
-    label.textContent = tier1Option.tier2Prompt;
-    const select = document.createElement("select");
-    select.dataset.field = "tier2";
-    select.innerHTML = `<option value="">Select an option</option>${tier1Option.tier2Options
-      .map((opt) => `<option value="${opt}">${opt.replace(/_/g, " ")}</option>`)
-      .join("")}`;
-    label.appendChild(select);
-    tier2Slot.appendChild(label);
-    select.addEventListener("change", () => renderTier3(tier1Option, select.value));
-    if (existing?.tier2) {
-      select.value = existing.tier2;
-      renderTier3(tier1Option, existing.tier2, existing.tier3 || []);
-    }
-  };
-
-  const renderTier3 = (tier1Option, tier2Value, existingTier3 = []) => {
-    tier3Slot.innerHTML = "";
-    if (!tier2Value) return;
-    const tier3ByTier2 = tier1Option.tier3ByTier2 || {};
-    const questions = tier3ByTier2[tier2Value] || [];
-    questions.forEach((question, index) => {
-      const label = document.createElement("label");
-      label.textContent = question.prompt;
-      const select = document.createElement("select");
-      select.dataset.field = `tier3-${index}`;
-      select.innerHTML = `<option value="">Select an option</option>${question.options
-        .map((opt) => `<option value="${opt}">${opt.replace(/_/g, " ")}</option>`)
-        .join("")}`;
-      if (existingTier3[index]) select.value = existingTier3[index];
-      label.appendChild(select);
-      tier3Slot.appendChild(label);
-    });
-    const override = tier1Option.freeTextPromptOverride || route.freeTextPrompt || "Optional free text";
-    const freeTextLabel = card.querySelector("[data-field='freeTextLabel']");
-    if (freeTextLabel) freeTextLabel.textContent = override;
-  };
-
-  tier1Select.addEventListener("change", renderTier2);
-
-  if (existing) {
-    tier1Select.value = existing.tier1 || "";
-    freeTextInput.value = existing.freeText || "";
-    renderTier2();
+const optionHuePair = (key) => {
+  let h = 0;
+  const s = String(key);
+  for (let i = 0; i < s.length; i += 1) {
+    h = (h * 31 + s.charCodeAt(i)) >>> 0;
   }
+  const h1 = h % 360;
+  const h2 = (h * 17 + 127) % 360;
+  return { h1, h2 };
 };
+
+const optionEmoji = (key) => {
+  let h = 0;
+  const s = String(key);
+  for (let i = 0; i < s.length; i += 1) {
+    h = (h * 13 + s.charCodeAt(i)) >>> 0;
+  }
+  return ICE_EMOJI_DECK[h % ICE_EMOJI_DECK.length];
+};
+
+const formatOptionLabel = (code) =>
+  String(code)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+const tier1OptionsForTiles = (route) => route.tier1Options.slice(0, TIER1_TILE_CAP);
+
+const findAssignedRouteIndex = (routes, responses) => {
+  const done = new Set(responses.map((r) => r.routeId));
+  const idx = routes.findIndex((r) => !done.has(r.routeId));
+  return idx === -1 ? routes.length : idx;
+};
+
+const emptyDraft = (routeId) => ({
+  routeId,
+  step: 1,
+  tier1: "",
+  tier2: "",
+  tier3: [],
+  freeText: "",
+});
+
+const normalizeDraft = (route, raw) => {
+  const base = emptyDraft(route.routeId);
+  const d = {
+    ...base,
+    ...(raw || {}),
+    routeId: route.routeId,
+    tier3: Array.isArray(raw?.tier3) ? [...raw.tier3] : [],
+  };
+  if (d.step < 1) d.step = 1;
+  if (d.step > ROUTE_STEPS) d.step = ROUTE_STEPS;
+  return d;
+};
+
+const getTier1Branch = (route, tier1Code) => route.tier1Options.find((o) => o.code === tier1Code);
+
+const getTier3Questions = (tier1Option, tier2Value) => {
+  if (!tier1Option || !tier2Value) return [];
+  return (tier1Option.tier3ByTier2 || {})[tier2Value] || [];
+};
+
+const freeTextPromptForRoute = (route, tier1Option) =>
+  tier1Option?.freeTextPromptOverride || route.freeTextPrompt || "Optional: share one specific example";
 
 const renderWave = () => {
   const waveStatus = document.getElementById("wave-status");
@@ -510,9 +497,280 @@ const bindProfilePage = () => {
 };
 
 const bindQuestionsPage = () => {
-  const form = document.getElementById("questionnaire-form");
-  const list = document.getElementById("question-list");
-  if (!form || !list) return;
+  const stage = document.getElementById("icebreaker-stage");
+  const pill = document.getElementById("icebreaker-step-pill");
+  const routeTitleEl = document.getElementById("icebreaker-route-title");
+  const promptEl = document.getElementById("icebreaker-prompt");
+  const backBtn = document.getElementById("icebreaker-back");
+  if (!stage || !pill || !routeTitleEl || !promptEl || !backBtn) return;
+
+  let assignedRoutes = [];
+  let routeIndex = 0;
+  let draft = null;
+
+  const persist = () => {
+    state.icebreakerDraft = draft;
+    saveState(state);
+  };
+
+  const renderTiles = (container, items, layout, onPick) => {
+    container.innerHTML = "";
+    const grid = document.createElement("div");
+    grid.className = layout === "4" ? "ice-tile-grid ice-tile-grid--four" : "ice-tile-grid ice-tile-grid--two";
+    items.forEach((item) => {
+      const { value, label } = item;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ice-tile";
+      const { h1, h2 } = optionHuePair(`${value}:${label}`);
+      const art = document.createElement("span");
+      art.className = "ice-tile__visual";
+      art.style.background = `linear-gradient(135deg, hsl(${h1}, 72%, 52%), hsl(${h2}, 70%, 38%))`;
+      const emoji = document.createElement("span");
+      emoji.className = "ice-tile__emoji";
+      emoji.setAttribute("aria-hidden", "true");
+      emoji.textContent = optionEmoji(value);
+      art.appendChild(emoji);
+      const lab = document.createElement("span");
+      lab.className = "ice-tile__label";
+      lab.textContent = label;
+      btn.appendChild(art);
+      btn.appendChild(lab);
+      btn.addEventListener("click", () => onPick(value));
+      grid.appendChild(btn);
+    });
+    container.appendChild(grid);
+  };
+
+  const syncChrome = () => {
+    const route = assignedRoutes[routeIndex];
+    if (!route || !draft) return;
+    pill.textContent = `Route ${routeIndex + 1} of ${assignedRoutes.length} · Step ${draft.step} of ${ROUTE_STEPS}`;
+    routeTitleEl.textContent = route.title;
+    backBtn.hidden = draft.step <= 1;
+  };
+
+  const tier3AnswersValid = (tier3List, t3Questions) => {
+    const filled = (tier3List || []).filter(Boolean);
+    if (t3Questions.length === 0) return true;
+    if (t3Questions.length === 1) return filled.length >= 1;
+    return filled.length >= 2;
+  };
+
+  const finishRoute = async () => {
+    const route = assignedRoutes[routeIndex];
+    if (!route || !draft) return;
+    const tier1Option = getTier1Branch(route, draft.tier1);
+    const t3q = getTier3Questions(tier1Option, draft.tier2);
+    const tier3 = [...draft.tier3];
+    if (!draft.tier1 || !draft.tier2 || !tier3AnswersValid(tier3, t3q)) {
+      setStatus("Please complete each choice for this route.", "error");
+      render();
+      return;
+    }
+    const freeText = (draft.freeText || "").trim();
+    const response = {
+      questionId: `${route.routeId}:${draft.tier1}:${draft.tier2}`,
+      answer: `${draft.tier1} > ${draft.tier2} > ${tier3.filter(Boolean).join(", ")}`,
+      routeId: route.routeId,
+      tier1: draft.tier1,
+      tier2: draft.tier2,
+      tier3,
+      freeText,
+      answeredAt: new Date().toISOString(),
+    };
+    state.icebreakerResponses = state.icebreakerResponses.filter((r) => r.routeId !== route.routeId);
+    state.icebreakerResponses.push(response);
+    state.icebreakerDraft = null;
+    draft = null;
+    saveState(state);
+
+    if (state.icebreakerResponses.length < REQUIRED_ASSIGNED_ROUTES) {
+      routeIndex = findAssignedRouteIndex(assignedRoutes, state.icebreakerResponses);
+      const nextRoute = assignedRoutes[routeIndex];
+      draft = emptyDraft(nextRoute.routeId);
+      state.icebreakerDraft = draft;
+      saveState(state);
+      const remaining = REQUIRED_ASSIGNED_ROUTES - state.icebreakerResponses.length;
+      setStatus(`Saved. ${remaining} more route${remaining === 1 ? "" : "s"} to go.`, "success");
+      render();
+      return;
+    }
+
+    try {
+      await apiFetch("/api/onboarding/questions", {
+        method: "POST",
+        body: JSON.stringify({ icebreakerResponses: state.icebreakerResponses }),
+      });
+      state.answers = state.icebreakerResponses.map((r) => r.answer);
+      state.icebreakerDraft = null;
+      saveState(state);
+      navigate("./consent.html");
+    } catch (error) {
+      draft = normalizeDraft(route, {
+        routeId: route.routeId,
+        step: ROUTE_STEPS,
+        tier1: response.tier1,
+        tier2: response.tier2,
+        tier3: response.tier3,
+        freeText: response.freeText,
+      });
+      state.icebreakerDraft = draft;
+      state.icebreakerResponses = state.icebreakerResponses.filter((r) => r.routeId !== route.routeId);
+      saveState(state);
+      setStatus(error instanceof Error ? error.message : "Questionnaire save failed.", "error");
+      render();
+    }
+  };
+
+  const render = () => {
+    const route = assignedRoutes[routeIndex];
+    if (!route || !draft) return;
+    draft = normalizeDraft(route, draft);
+    syncChrome();
+    stage.innerHTML = "";
+    promptEl.textContent = "";
+
+    if (draft.step === 1) {
+      promptEl.textContent = route.tier1Prompt;
+      const opts = tier1OptionsForTiles(route).map((o) => ({ value: o.code, label: o.label }));
+      renderTiles(stage, opts, "4", (code) => {
+        draft.tier1 = code;
+        draft.tier2 = "";
+        draft.tier3 = [];
+        draft.freeText = "";
+        draft.step = 2;
+        persist();
+        render();
+      });
+      return;
+    }
+
+    const tier1Option = getTier1Branch(route, draft.tier1);
+    if (!tier1Option) {
+      draft.step = 1;
+      draft.tier1 = "";
+      persist();
+      render();
+      return;
+    }
+
+    if (draft.step === 2) {
+      promptEl.textContent = tier1Option.tier2Prompt;
+      const opts = (tier1Option.tier2Options || []).map((code) => ({
+        value: code,
+        label: formatOptionLabel(code),
+      }));
+      renderTiles(stage, opts, "2", (code) => {
+        draft.tier2 = code;
+        draft.tier3 = [];
+        draft.freeText = "";
+        draft.step = 3;
+        persist();
+        render();
+      });
+      return;
+    }
+
+    const t3 = getTier3Questions(tier1Option, draft.tier2);
+
+    if (draft.step === 3) {
+      const q = t3[0];
+      if (!q) {
+        draft.step = 5;
+        persist();
+        render();
+        return;
+      }
+      promptEl.textContent = q.prompt;
+      const opts = q.options.map((code) => ({ value: code, label: formatOptionLabel(code) }));
+      renderTiles(stage, opts, "2", (code) => {
+        draft.tier3 = [code];
+        draft.freeText = "";
+        draft.step = t3.length >= 2 ? 4 : 5;
+        persist();
+        render();
+      });
+      return;
+    }
+
+    if (draft.step === 4) {
+      const q = t3[1];
+      if (!q) {
+        draft.step = 5;
+        persist();
+        render();
+        return;
+      }
+      promptEl.textContent = q.prompt;
+      const opts = q.options.map((code) => ({ value: code, label: formatOptionLabel(code) }));
+      renderTiles(stage, opts, "2", (code) => {
+        const first = draft.tier3[0] || "";
+        draft.tier3 = [first, code];
+        draft.freeText = "";
+        draft.step = 5;
+        persist();
+        render();
+      });
+      return;
+    }
+
+    if (draft.step === 5) {
+      promptEl.textContent = freeTextPromptForRoute(route, tier1Option);
+      const wrap = document.createElement("div");
+      wrap.className = "ice-free-wrap";
+      const ta = document.createElement("textarea");
+      ta.className = "ice-free-text";
+      ta.placeholder = "Optional — add a fun detail";
+      ta.value = draft.freeText || "";
+      ta.rows = 4;
+      ta.addEventListener("input", () => {
+        draft.freeText = ta.value;
+        persist();
+      });
+      const actions = document.createElement("div");
+      actions.className = "ice-primary-actions";
+      const nextBtn = document.createElement("button");
+      nextBtn.type = "button";
+      nextBtn.textContent =
+        routeIndex + 1 >= assignedRoutes.length ? "Finish icebreakers" : "Save & next route";
+      nextBtn.addEventListener("click", () => finishRoute());
+      actions.appendChild(nextBtn);
+      wrap.appendChild(ta);
+      wrap.appendChild(actions);
+      stage.appendChild(wrap);
+    }
+  };
+
+  backBtn.addEventListener("click", () => {
+    if (!draft || draft.step <= 1) return;
+    const route = assignedRoutes[routeIndex];
+    const tier1Option = getTier1Branch(route, draft.tier1);
+    const t3 = getTier3Questions(tier1Option, draft.tier2);
+
+    if (draft.step === 5) {
+      if (t3.length >= 2) {
+        draft.step = 4;
+        draft.tier3 = draft.tier3.slice(0, 1);
+      } else {
+        draft.step = 3;
+        draft.tier3 = [];
+      }
+      draft.freeText = "";
+    } else if (draft.step === 4) {
+      draft.step = 3;
+      draft.tier3 = [];
+    } else if (draft.step === 3) {
+      draft.step = 2;
+      draft.tier3 = [];
+    } else if (draft.step === 2) {
+      draft.step = 1;
+      draft.tier2 = "";
+      draft.tier3 = [];
+    }
+    persist();
+    render();
+  });
 
   const hydrate = async () => {
     try {
@@ -526,70 +784,40 @@ const bindQuestionsPage = () => {
       if (!Array.isArray(state.assignedRouteIds) || state.assignedRouteIds.length !== REQUIRED_ASSIGNED_ROUTES) {
         state.assignedRouteIds = shuffle(routes.map((r) => r.routeId)).slice(0, REQUIRED_ASSIGNED_ROUTES);
       }
-      const assignedRoutes = state.assignedRouteIds
-        .map((id) => routes.find((route) => route.routeId === id))
+      assignedRoutes = state.assignedRouteIds
+        .map((id) => routes.find((r) => r.routeId === id))
         .filter(Boolean);
-      const existingByRoute = new Map(
-        (state.icebreakerResponses || []).map((entry) => [entry.routeId, entry])
-      );
-      list.innerHTML = "";
-      assignedRoutes.forEach((route) => {
-        renderRouteBuilder(list, route, existingByRoute.get(route.routeId));
-      });
+      if (assignedRoutes.length < REQUIRED_ASSIGNED_ROUTES) {
+        setStatus("Assigned routes could not be resolved.", "error");
+        return;
+      }
+
+      routeIndex = findAssignedRouteIndex(assignedRoutes, state.icebreakerResponses);
+      if (routeIndex >= assignedRoutes.length) {
+        navigate("./consent.html");
+        return;
+      }
+
+      const currentRoute = assignedRoutes[routeIndex];
+      if (state.icebreakerDraft && state.icebreakerDraft.routeId === currentRoute.routeId) {
+        draft = normalizeDraft(currentRoute, state.icebreakerDraft);
+      } else {
+        draft = emptyDraft(currentRoute.routeId);
+        state.icebreakerDraft = draft;
+      }
       saveState(state);
-      setStatus(`Complete ${REQUIRED_ASSIGNED_ROUTES} routes to continue.`, "info");
+      const remaining = REQUIRED_ASSIGNED_ROUTES - state.icebreakerResponses.length;
+      setStatus(
+        remaining > 0
+          ? `Tap a tile to choose — ${remaining} route${remaining === 1 ? "" : "s"} left after you finish this one.`
+          : "Almost done.",
+        "info"
+      );
+      render();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Unable to load route catalog.", "error");
     }
   };
-
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const cards = Array.from(list.querySelectorAll("[data-route-id]"));
-    const responses = [];
-
-    for (const card of cards) {
-      const routeId = card.dataset.routeId;
-      const tier1 = card.querySelector("select[data-field='tier1']")?.value || "";
-      const tier2 = card.querySelector("select[data-field='tier2']")?.value || "";
-      const tier3 = Array.from(card.querySelectorAll("select[data-field^='tier3-']"))
-        .map((input) => input.value)
-        .filter(Boolean);
-      const freeText = card.querySelector("input[data-field='freeText']")?.value.trim() || "";
-      if (!routeId || !tier1 || !tier2 || tier3.length < 2) {
-        setStatus("Please answer all required route selections.", "error");
-        return;
-      }
-      responses.push({
-        questionId: `${routeId}:${tier1}:${tier2}`,
-        answer: `${tier1} > ${tier2} > ${tier3.join(", ")}`,
-        routeId,
-        tier1,
-        tier2,
-        tier3,
-        freeText,
-        answeredAt: new Date().toISOString(),
-      });
-    }
-
-    if (responses.length < REQUIRED_ASSIGNED_ROUTES) {
-      setStatus(`Answer all ${REQUIRED_ASSIGNED_ROUTES} assigned routes.`, "error");
-      return;
-    }
-
-    try {
-      await apiFetch("/api/onboarding/questions", {
-        method: "POST",
-        body: JSON.stringify({ icebreakerResponses: responses }),
-      });
-      state.icebreakerResponses = responses;
-      state.answers = responses.map((response) => response.answer);
-      saveState(state);
-      navigate("./consent.html");
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Questionnaire save failed.", "error");
-    }
-  });
 
   hydrate();
 };

@@ -9,6 +9,7 @@ Feature behavior and requirements live in `docs/features/*.md`.
 - Route/resource definitions: `docs/resource/*`
 - MVP scope and acceptance criteria: `docs/MVP.md`
 - Shared contracts/types: `packages/shared/*`
+- **HTTP API implementation:** `api/handler.js` (Vercel serverless; exercised via **Git-built** Preview/Production URLs, or optionally `npx vercel dev` from repo root)
 
 If there is a conflict, resolve in this order:
 1. `docs/MVP.md`
@@ -18,8 +19,10 @@ If there is a conflict, resolve in this order:
 ## Ownership Boundaries
 
 - Frontend owner area: `apps/web/*`
-- Backend owner area: `apps/api/*`
+- **Backend owner area: `api/*` (Vercel serverless — primary file `api/handler.js`)**
 - Shared contracts/integration: `packages/shared/*`
+
+The repository **does not** use `apps/api/server.js` as the canonical API. Production and Preview traffic go through **Vercel** (Git sync or CLI deploy) so `/api/*` hits `api/handler.js`. For local full-stack iteration you may use **`npx vercel dev`** or test against a **Preview URL** after push. The `apps/api/` folder is archival documentation only (see `apps/api/README.md`).
 
 Agents should stay in their owner area unless explicitly asked to work cross-area.
 
@@ -77,7 +80,7 @@ Raise blockers immediately when:
 - Required API contract is missing or ambiguous.
 - Owner-boundary work is required but not requested.
 - Security/privacy requirement is unclear.
-- Acceptance criteria cannot be validated with available environment.
+- Acceptance criteria cannot be validated with available environment (remember: validate on a **Vercel Preview/Production** URL from Git, or optionally **`npx vercel dev`** — not a bare static server plus a separate API port).
 
 When escalating, provide:
 - blocker summary
@@ -106,8 +109,8 @@ LinkedIn-first entry -> Google fallback -> manual profile fallback -> handoff to
 
 Scope (strict):
 - Work only in `apps/web`.
-- Do not implement backend API handlers.
-- If backend endpoint support is missing, add an adapter/mock-safe UI fallback and document exact API contract needed.
+- Do not implement backend API handlers (backend is `api/handler.js`, owned separately).
+- If an endpoint is missing from `api/handler.js`, add a mock-safe UI fallback and document the contract gap for the API owner.
 
 Required behavior:
 1) QR/mobile landing entry clearly presents LinkedIn as first/default auth option.
@@ -153,7 +156,7 @@ Goal:
 Implement or adapt minimal backend support for provider-auth bootstrap and manual profile bootstrap needed by web flow.
 
 Scope (strict):
-- Work only in `apps/api` (and `packages/shared` only when unavoidable for contract alignment).
+- Work only in `api/` (primarily `api/handler.js`) and `packages/shared` only when unavoidable for contract alignment.
 - Do not implement frontend UI.
 
 Required backend capabilities:
@@ -172,10 +175,10 @@ MVP constraints:
 - Keep contract explicit about optional vs required fields.
 
 Deliverables:
-1) API routes/handlers changed or added.
+1) `api/handler.js` routes changed or added (Vercel serverless).
 2) Request/response contract summary (including validation errors).
-3) Env/config requirements.
-4) Test commands and results.
+3) Env/config requirements for Vercel.
+4) How you tested (Vercel Preview URL after Git push, and/or `npx vercel dev`) and results.
 5) Follow-up list for post-MVP enrichment APIs.
 ```
 
@@ -194,7 +197,7 @@ Goal:
 Validate that `01_auth` meets acceptance criteria end-to-end and is demo-safe on mobile.
 
 Scope:
-- Validate integrated behavior across `apps/web` and `apps/api`.
+- Validate integrated behavior across `apps/web` and `api/handler.js` (via **Git-built** Vercel Preview/Production, and/or `npx vercel dev`).
 - Prioritize user-visible failures and dead-end risks.
 
 Test matrix (minimum):
@@ -232,7 +235,7 @@ Review implementation completeness, integration risk, and produce merge-ready se
 Review checklist:
 1) Acceptance criteria coverage from `01_auth.md` is complete.
 2) No dead-end onboarding paths remain.
-3) Owner boundaries were respected (web in `apps/web`, API in `apps/api`).
+3) Owner boundaries were respected (web in `apps/web`, API in `api/handler.js`).
 4) Contract mismatches are resolved or clearly called out.
 5) MVP constraints on LinkedIn enrichment were respected.
 
