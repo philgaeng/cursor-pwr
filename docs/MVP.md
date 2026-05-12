@@ -14,6 +14,7 @@ The MVP ships as a **Vercel** project. Do **not** maintain a second local-only A
 |--------|-----------|--------|
 | Static UI | `apps/web/*` | Served via `vercel.json` rewrites to the site root and asset paths. |
 | HTTP API | `api/handler.js` | Single serverless entry; routes are invoked as `/api/...` per `vercel.json`. |
+| Durable data | **Supabase (Postgres)** | Schema migrations live under `supabase/migrations/`. The API uses server-side connection env vars from Vercel (see integration); in-memory / JSON-on-disk remain acceptable only for narrow local/dev fallbacks until routes are wired to SQL. |
 | Icebreaker catalog | `docs/resource/icebreaker-routes.v1.json` | Bundled with the deployment; read by the handler at runtime. |
 
 **Deployment (typical):** connect the Git repo to Vercel and **push branches**; Vercel builds and deploys **Preview** (per branch/PR) and **Production** (your production branch). No Vercel CLI is required for deploy if you use Git sync.
@@ -35,7 +36,7 @@ Serving only `apps/web` with a plain static file server **without** one of the a
 
 ## Non-goals (MVP)
 
-- Multi-region durable persistence on Vercel (in-memory/globalThis store is demo-appropriate; document limits).
+- Multi-region HA database topology (a single Supabase Postgres project is sufficient for MVP scale).
 - Separate long-lived Node process as the canonical API (`apps/api/server.js` removed; see `apps/api/README.md`).
 - Full LinkedIn/Google OAuth production hardening (demo/session stubs only unless spec says otherwise).
 
@@ -67,5 +68,5 @@ Minimum routes used by the current web app:
 
 ## Open questions
 
-- When to introduce a real database and auth provider vs. demo store.
+- **Auth beyond MVP:** whether attendee flows move to Supabase Auth (or another IdP) vs. keeping stub/demo auth on the handler while Postgres stores state.
 - Contract formalization: whether to regenerate `packages/shared` types from a single OpenAPI/schema for the handler.

@@ -98,7 +98,7 @@ Final endpoint naming can change, but behavior and event scoping must stay expli
 | `event_key` uniqueness | Unique **per organizer**; value can be UUID |
 | Archive/delete events (MVP) | No |
 | Clone event (MVP) | Yes (duplicate `settings` + `icebreaker_routes` + `details` into new `event_key`) |
-| Persistence (MVP) | JSON file on disk (implementation: single-writer path, e.g. repo `data/` gitignored — **note:** Vercel serverless has no durable local disk across invocations; treat “JSON file” as **local/dev** or move to Vercel Blob / KV / DB for Preview/Production in a follow-up). |
+| Persistence (MVP) | **Primary (target):** Postgres on Supabase (`nl_organizers`, `nl_events`, `nl_organizer_sessions` — see `supabase/migrations/`). **Transitional:** JSON file on disk for local/dev and until `api/organizer-auth-store.js` is wired to SQL (Vercel has no durable local disk across invocations). |
 | Migration from `__organizerSettings` | Keep organizer-level shell; move today’s flat settings payload into **first default event**’s `settings` / routes fields. |
 | Route catalog history | **One** prior version per event for restore (same spirit as spec 09). |
 | After login | Auto-open **last active** `event_key` (persist client-side + optionally server-side on organizer record). |
