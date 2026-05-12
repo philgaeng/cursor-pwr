@@ -1,9 +1,11 @@
 const { randomUUID } = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
+const organizerAuth = require("./organizer-auth-store");
 
 const DEMO_MODE_ENABLED = process.env.DEMO_MODE_ENABLED !== "false";
 const EVENT_ID = "demo-event-2026";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
 const GLOBAL_TAG_CATALOG = Object.freeze({
   offers: [
@@ -85,6 +87,7 @@ const buildDefaultOrganizerSettings = () => ({
       "hot_takes",
     ],
     crowdCues: "",
+    generationStyleNotes: "",
   },
   physicalMeetup: {
     enabled: true,
@@ -95,6 +98,12 @@ const buildDefaultOrganizerSettings = () => ({
     },
     wearablePrompt: "What are you wearing so your match can spot you quickly?",
   },
+  /** Published override served by GET /routes/catalog when valid. Null = use bundled JSON file. */
+  icebreakerRoutes: null,
+  /** Last generation result (staging); replaced on each generate. Not served to attendees until published. */
+  icebreakerRoutesDraft: null,
+  /** Single previous published catalog for rollback (spec 09). */
+  icebreakerRoutesHistory: [],
   parameters: {
     onboarding: {
       requiredOfferTags: 1,
@@ -143,9 +152,10 @@ const buildDefaultOrganizerSettings = () => ({
   },
 });
 
-if (!globalThis.__organizerSettings) {
-  globalThis.__organizerSettings = buildDefaultOrganizerSettings();
-}
+organizerAuth.loadOrganizerStoreFromDisk(buildDefaultOrganizerSettings);
+organizerAuth.getDefaultPublicOrganizerProjection(buildDefaultOrganizerSettings, (projection) => {
+  globalThis.__organizerSettings = projection;
+});
 
 const mergeObjects = (base, override) => {
   if (Array.isArray(base) && Array.isArray(override)) {
@@ -189,6 +199,71 @@ const isPositiveInteger = (value) => Number.isInteger(value) && value > 0;
 
 const isEmail = (value) =>
   typeof value === "string" && value.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
+const validateTier3Branch = (branch) => {
+  if (!Array.isArray(branch) || branch.length !== 2) return false;
+  return branch.every(
+    (q) =>
+      q &&
+      typeof q === "object" &&
+      isNonEmptyString(q.prompt) &&
+      Array.isArray(q.options) &&
+      q.options.length === 2 &&
+      q.options.every((o) => isNonEmptyString(o))
+  );
+};
+
+const validateIcebreakerRoutesCatalog = (catalog) => {
+  if (catalog === null || catalog === undefined) return null;
+  if (typeof catalog !== "object") {
+    return "icebreakerRoutes must be an object or null.";
+  }
+  if (!Array.isArray(catalog.routes) || catalog.routes.length < 1) {
+    return "icebreakerRoutes.routes must be a non-empty array.";
+  }
+  for (let r = 0; r < catalog.routes.length; r += 1) {
+    const route = catalog.routes[r];
+    if (!route || typeof route !== "object") {
+      return `icebreakerRoutes.routes[${r}] must be an object.`;
+    }
+    if (!isNonEmptyString(route.routeId) || !isNonEmptyString(route.title) || !isNonEmptyString(route.tier1Prompt)) {
+      return `icebreakerRoutes.routes[${r}] requires routeId, title, and tier1Prompt.`;
+    }
+    if (!Array.isArray(route.tier1Options) || route.tier1Options.length !== 4) {
+      return `icebreakerRoutes.routes[${r}] must have exactly 4 tier1Options.`;
+    }
+    for (let t = 0; t < route.tier1Options.length; t += 1) {
+      const opt = route.tier1Options[t];
+      if (!opt || typeof opt !== "object") {
+        return `icebreakerRoutes.routes[${r}].tier1Options[${t}] invalid.`;
+      }
+      if (!isNonEmptyString(opt.code) || !isNonEmptyString(opt.label) || !isNonEmptyString(opt.tier2Prompt)) {
+        return `icebreakerRoutes.routes[${r}].tier1Options[${t}] requires code, label, tier2Prompt.`;
+      }
+      if (!Array.isArray(opt.tier2Options) || opt.tier2Options.length !== 2) {
+        return `icebreakerRoutes.routes[${r}].tier1Options[${t}] must have exactly 2 tier2Options.`;
+      }
+      if (opt.tier3Mode !== "branch_specific_dual") {
+        return `icebreakerRoutes.routes[${r}].tier1Options[${t}] must use tier3Mode branch_specific_dual.`;
+      }
+      const map = opt.tier3ByTier2;
+      if (!map || typeof map !== "object") {
+        return `icebreakerRoutes.routes[${r}].tier1Options[${t}] requires tier3ByTier2.`;
+      }
+      const [a, b] = opt.tier2Options.map((x) => String(x));
+      if (!validateTier3Branch(map[a]) || !validateTier3Branch(map[b])) {
+        return `icebreakerRoutes.routes[${r}].tier1Options[${t}] tier3ByTier2 must match tier2Options with two dual questions each.`;
+      }
+    }
+  }
+  return null;
+};
+
+const getPublishedOrganizerRouteCatalog = () => {
+  const cat = globalThis.__organizerSettings?.icebreakerRoutes;
+  if (!cat || typeof cat !== "object") return null;
+  return validateIcebreakerRoutesCatalog(cat) === null ? cat : null;
+};
 
 const validateOrganizerSettings = (settings) => {
   if (!settings || typeof settings !== "object") {
@@ -238,10 +313,24 @@ const validateOrganizerSettings = (settings) => {
       return "physicalMeetup.signs.options must contain non-empty strings when signs are enabled.";
     }
   }
+  const routeErr = validateIcebreakerRoutesCatalog(settings.icebreakerRoutes);
+  if (routeErr) {
+    return routeErr;
+  }
+  if (
+    settings.icebreakerRoutesHistory != null &&
+    (!Array.isArray(settings.icebreakerRoutesHistory) || settings.icebreakerRoutesHistory.length > 1)
+  ) {
+    return "icebreakerRoutesHistory must be an array with at most one rollback entry.";
+  }
   return null;
 };
 
 const getRouteCatalog = () => {
+  const published = getPublishedOrganizerRouteCatalog();
+  if (published) {
+    return published;
+  }
   if (globalThis.__routeCatalog) {
     return globalThis.__routeCatalog;
   }
@@ -336,6 +425,125 @@ const normalizeAnswers = (answers) => {
     }));
 };
 
+const toRouteId = (value, fallbackIndex) => {
+  const base = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (base) return base;
+  return `route_${fallbackIndex + 1}`;
+};
+
+const titleCase = (value) =>
+  String(value || "")
+    .trim()
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+
+const buildDeterministicRoute = (topic, index) => {
+  const routeId = toRouteId(topic, index);
+  const title = titleCase(topic) || `Route ${index + 1}`;
+  const makeTier1 = (n) => {
+    const code = `${routeId}_option_${n}`;
+    const a = `${routeId}_a${n}`;
+    const b = `${routeId}_b${n}`;
+    return {
+      code,
+      label: `${title} ${n}`,
+      tier2Prompt: `Choose one style for ${title.toLowerCase()}:`,
+      tier2Options: [a, b],
+      tier3Mode: "branch_specific_dual",
+      tier3ByTier2: {
+        [a]: [
+          { prompt: "Pick one:", options: [`${routeId}_x${n}`, `${routeId}_y${n}`] },
+          { prompt: "Pick one:", options: [`${routeId}_m${n}`, `${routeId}_n${n}`] },
+        ],
+        [b]: [
+          { prompt: "Pick one:", options: [`${routeId}_p${n}`, `${routeId}_q${n}`] },
+          { prompt: "Pick one:", options: [`${routeId}_u${n}`, `${routeId}_v${n}`] },
+        ],
+      },
+      freeTextPromptOverride: `Optional: your favorite ${title.toLowerCase()} example`,
+    };
+  };
+  return {
+    routeId,
+    title,
+    tier1Prompt: `Which ${title.toLowerCase()} topic fits you best?`,
+    tier1Options: [makeTier1(1), makeTier1(2), makeTier1(3), makeTier1(4)],
+    freeTextPrompt: `Optional: one ${title.toLowerCase()} detail you enjoy sharing`,
+  };
+};
+
+const buildDeterministicCatalog = (selectedTopics) => ({
+  version: "v1",
+  language: "en",
+  routesPerParticipant: 3,
+  freeTextDefault: {
+    enabled: true,
+    label: "Optional: share one specific example",
+  },
+  routes: selectedTopics.map((topic, index) => buildDeterministicRoute(topic, index)),
+});
+
+const tryGenerateCatalogWithOpenAI = async ({
+  selectedTopics,
+  crowdCues,
+  eventDescription,
+  generationStyleNotes,
+}) => {
+  if (!OPENAI_API_KEY) return null;
+  const prompt = `Generate a strict JSON object for an icebreaker route catalog.
+Output must be valid JSON only. Do not wrap in markdown.
+Schema top-level:
+{
+  "version":"v1",
+  "language":"en",
+  "routesPerParticipant":3,
+  "freeTextDefault":{"enabled":true,"label":"Optional: share one specific example"},
+  "routes":[ ... ]
+}
+Each route must include:
+routeId, title, tier1Prompt, tier1Options (exactly 4), freeTextPrompt.
+Each tier1Option must include:
+code, label, tier2Prompt, tier2Options (exactly 2), tier3Mode="branch_specific_dual", tier3ByTier2 with two keys matching tier2 options and each key has exactly two questions each with exactly two options, freeTextPromptOverride.
+Use snake_case codes for routeId, tier1 option codes, tier2 option codes, and tier3 option codes.
+
+Context from organizer (follow closely):
+- Selected route topics (one JSON object per topic, in order): ${JSON.stringify(selectedTopics)}
+- Event description: ${String(eventDescription || "")}
+- Crowd cues (free text — may include audience, tone, boundaries, off-limits, examples; treat all of it as authoritative guidance): ${String(crowdCues || "")}
+- Additional generation style notes (optional free text): ${String(generationStyleNotes || "")}
+
+Respect audience and tone from crowd cues. Avoid topics or wording that violate stated boundaries. Keep prompts short and event-appropriate.`;
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4.1-mini",
+        input: prompt,
+      }),
+    });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    const outputText = payload?.output_text;
+    if (!outputText || typeof outputText !== "string") return null;
+    const parsed = JSON.parse(outputText);
+    if (!parsed || !Array.isArray(parsed.routes)) return null;
+    return parsed;
+  } catch (_error) {
+    return null;
+  }
+};
+
 /**
  * Vercel Node serverless often leaves `req.body` unset; the JSON payload must be read from the stream.
  */
@@ -376,6 +584,28 @@ const readJsonBody = async (req) => {
   } catch (_e) {
     return {};
   }
+};
+
+const getOrganizerBearerToken = (req, body) => {
+  const auth = req.headers.authorization || req.headers.Authorization;
+  if (isNonEmptyString(auth) && String(auth).toLowerCase().startsWith("bearer ")) {
+    return String(auth).slice(7).trim();
+  }
+  if (body && isNonEmptyString(body.organizerSessionToken)) {
+    return String(body.organizerSessionToken).trim();
+  }
+  return null;
+};
+
+const requireOrganizerSession = (req, body) => {
+  const token = getOrganizerBearerToken(req, body);
+  const organizer = organizerAuth.getOrganizerForSession(token);
+  if (!organizer) return null;
+  return { token, organizer, organizerKey: organizer.key };
+};
+
+const persistOrganizerGlobalSettings = (organizerKey) => {
+  organizerAuth.applyFullActiveEventSettings(organizerKey, globalThis.__organizerSettings);
 };
 
 const getUserId = (req, body) =>
@@ -580,26 +810,348 @@ module.exports = async (req, res) => {
       return;
     }
 
-    if (req.method === "GET" && path === "/organizer/settings") {
+    if (req.method === "POST" && path === "/organizer/signup") {
+      const created = organizerAuth.createOrganizer(body?.name, body?.email, body?.password, buildDefaultOrganizerSettings);
+      if (!created.ok) {
+        sendJson(res, 400, { ok: false, error: created.error });
+        return;
+      }
       sendJson(res, 200, {
         ok: true,
-        eventId: EVENT_ID,
+        organizerKey: created.organizer.key,
+        email: created.organizer.details.email,
+        diskWriteOk: organizerAuth.diskWriteSucceeded(),
+      });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/organizer/login") {
+      const logged = organizerAuth.loginOrganizer(body?.email, body?.password);
+      if (!logged.ok) {
+        sendJson(res, 401, { ok: false, error: logged.error });
+        return;
+      }
+      organizerAuth.syncGlobalOrganizerSettingsFromEvent(logged.organizer.key, logged.organizer.lastActiveEventKey, (projection) => {
+        globalThis.__organizerSettings = projection;
+      });
+      sendJson(res, 200, {
+        ok: true,
+        token: logged.token,
+        organizerKey: logged.organizer.key,
+        details: { name: logged.organizer.details.name, email: logged.organizer.details.email },
+        activeEventKey: logged.organizer.lastActiveEventKey,
+        diskWriteOk: organizerAuth.diskWriteSucceeded(),
+      });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/organizer/logout") {
+      const token = getOrganizerBearerToken(req, body);
+      organizerAuth.revokeOrganizerSession(token);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+
+    if (req.method === "GET" && path === "/organizer/me") {
+      const sess = requireOrganizerSession(req, body);
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: "Organizer session required." });
+        return;
+      }
+      organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, sess.organizer.lastActiveEventKey, (projection) => {
+        globalThis.__organizerSettings = projection;
+      });
+      sendJson(res, 200, {
+        ok: true,
+        organizerKey: sess.organizerKey,
+        details: sess.organizer.details,
+        activeEventKey: sess.organizer.lastActiveEventKey,
+        events: organizerAuth.listEvents(sess.organizerKey),
+        diskWriteOk: organizerAuth.diskWriteSucceeded(),
+      });
+      return;
+    }
+
+    if (req.method === "GET" && path === "/organizer/events") {
+      const sess = requireOrganizerSession(req, body);
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: "Organizer session required." });
+        return;
+      }
+      sendJson(res, 200, {
+        ok: true,
+        activeEventKey: sess.organizer.lastActiveEventKey,
+        events: organizerAuth.listEvents(sess.organizerKey),
+      });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/organizer/events") {
+      const sess = requireOrganizerSession(req, body);
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: "Organizer session required." });
+        return;
+      }
+      const name = isNonEmptyString(body?.name) ? body.name.trim() : "New event";
+      const created = organizerAuth.createEvent(sess.organizerKey, name, buildDefaultOrganizerSettings);
+      if (!created.ok) {
+        sendJson(res, 400, { ok: false, error: created.error });
+        return;
+      }
+      organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, created.eventKey, (projection) => {
+        globalThis.__organizerSettings = projection;
+      });
+      sendJson(res, 200, {
+        ok: true,
+        activeEventKey: created.eventKey,
         settings: globalThis.__organizerSettings,
+        events: organizerAuth.listEvents(sess.organizerKey),
+        diskWriteOk: organizerAuth.diskWriteSucceeded(),
+      });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/organizer/events/select") {
+      const sess = requireOrganizerSession(req, body);
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: "Organizer session required." });
+        return;
+      }
+      const eventKey = body?.eventKey;
+      if (!isNonEmptyString(eventKey)) {
+        sendJson(res, 400, { ok: false, error: "eventKey is required." });
+        return;
+      }
+      const sel = organizerAuth.setLastActiveEvent(sess.organizerKey, eventKey.trim());
+      if (!sel.ok) {
+        sendJson(res, 400, { ok: false, error: sel.error });
+        return;
+      }
+      organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, eventKey.trim(), (projection) => {
+        globalThis.__organizerSettings = projection;
+      });
+      sendJson(res, 200, {
+        ok: true,
+        activeEventKey: eventKey.trim(),
+        settings: globalThis.__organizerSettings,
+        events: organizerAuth.listEvents(sess.organizerKey),
+        diskWriteOk: organizerAuth.diskWriteSucceeded(),
+      });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/organizer/events/clone") {
+      const sess = requireOrganizerSession(req, body);
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: "Organizer session required." });
+        return;
+      }
+      const fromEventKey = isNonEmptyString(body?.fromEventKey) ? body.fromEventKey.trim() : sess.organizer.lastActiveEventKey;
+      const cloned = organizerAuth.cloneEvent(sess.organizerKey, fromEventKey, buildDefaultOrganizerSettings);
+      if (!cloned.ok) {
+        sendJson(res, 400, { ok: false, error: cloned.error });
+        return;
+      }
+      organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, cloned.eventKey, (projection) => {
+        globalThis.__organizerSettings = projection;
+      });
+      sendJson(res, 200, {
+        ok: true,
+        activeEventKey: cloned.eventKey,
+        settings: globalThis.__organizerSettings,
+        events: organizerAuth.listEvents(sess.organizerKey),
+        diskWriteOk: organizerAuth.diskWriteSucceeded(),
+      });
+      return;
+    }
+
+    if (req.method === "GET" && path === "/organizer/settings") {
+      const sess = requireOrganizerSession(req, body);
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: "Organizer session required." });
+        return;
+      }
+      organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, sess.organizer.lastActiveEventKey, (projection) => {
+        globalThis.__organizerSettings = projection;
+      });
+      sendJson(res, 200, {
+        ok: true,
+        eventId: globalThis.__organizerSettings?.eventInfo?.id || EVENT_ID,
+        organizerKey: sess.organizerKey,
+        activeEventKey: sess.organizer.lastActiveEventKey,
+        events: organizerAuth.listEvents(sess.organizerKey),
+        settings: globalThis.__organizerSettings,
+        diskWriteOk: organizerAuth.diskWriteSucceeded(),
       });
       return;
     }
 
     if (req.method === "POST" && path === "/organizer/settings") {
+      const sess = requireOrganizerSession(req, body);
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: "Organizer session required." });
+        return;
+      }
       const incomingSettings =
         body && typeof body === "object" && body.settings ? body.settings : body;
+      const prevPublished = getPublishedOrganizerRouteCatalog();
       const nextSettings = mergeObjects(globalThis.__organizerSettings, incomingSettings);
+      if (Object.prototype.hasOwnProperty.call(incomingSettings, "icebreakerRoutes")) {
+        const nextCat = nextSettings.icebreakerRoutes;
+        const nextValid =
+          nextCat &&
+          typeof nextCat === "object" &&
+          validateIcebreakerRoutesCatalog(nextCat) === null;
+        if (prevPublished && nextValid && JSON.stringify(prevPublished) !== JSON.stringify(nextCat)) {
+          nextSettings.icebreakerRoutesHistory = [
+            { catalog: prevPublished, savedAtIso: new Date().toISOString() },
+          ];
+        }
+        if (nextCat === null || nextCat === undefined) {
+          nextSettings.icebreakerRoutesHistory = [];
+        }
+      }
       const validationError = validateOrganizerSettings(nextSettings);
       if (validationError) {
         sendJson(res, 400, { ok: false, error: validationError });
         return;
       }
       globalThis.__organizerSettings = nextSettings;
-      sendJson(res, 200, { ok: true, eventId: EVENT_ID, settings: globalThis.__organizerSettings });
+      persistOrganizerGlobalSettings(sess.organizerKey);
+      globalThis.__routeCatalog = undefined;
+      sendJson(res, 200, {
+        ok: true,
+        eventId: globalThis.__organizerSettings?.eventInfo?.id || EVENT_ID,
+        organizerKey: sess.organizerKey,
+        activeEventKey: sess.organizer.lastActiveEventKey,
+        events: organizerAuth.listEvents(sess.organizerKey),
+        settings: globalThis.__organizerSettings,
+        diskWriteOk: organizerAuth.diskWriteSucceeded(),
+      });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/organizer/routes/publish") {
+      const sess = requireOrganizerSession(req, body);
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: "Organizer session required." });
+        return;
+      }
+      const catalog =
+        body && typeof body === "object" && body.catalog
+          ? body.catalog
+          : globalThis.__organizerSettings?.icebreakerRoutesDraft?.catalog;
+      const validationErr = validateIcebreakerRoutesCatalog(catalog);
+      if (validationErr) {
+        sendJson(res, 400, { ok: false, error: validationErr });
+        return;
+      }
+      const prev = getPublishedOrganizerRouteCatalog();
+      const history = [];
+      if (prev) {
+        history.push({
+          catalog: prev,
+          savedAtIso: new Date().toISOString(),
+        });
+      }
+      globalThis.__organizerSettings.icebreakerRoutes = catalog;
+      globalThis.__organizerSettings.icebreakerRoutesHistory = history;
+      globalThis.__organizerSettings.icebreakerRoutesDraft = null;
+      globalThis.__routeCatalog = undefined;
+      const settingsErr = validateOrganizerSettings(globalThis.__organizerSettings);
+      if (settingsErr) {
+        sendJson(res, 500, { ok: false, error: settingsErr });
+        return;
+      }
+      persistOrganizerGlobalSettings(sess.organizerKey);
+      sendJson(res, 200, {
+        ok: true,
+        eventId: globalThis.__organizerSettings?.eventInfo?.id || EVENT_ID,
+        organizerKey: sess.organizerKey,
+        activeEventKey: sess.organizer.lastActiveEventKey,
+        events: organizerAuth.listEvents(sess.organizerKey),
+        settings: globalThis.__organizerSettings,
+        diskWriteOk: organizerAuth.diskWriteSucceeded(),
+      });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/organizer/routes/rollback") {
+      const sess = requireOrganizerSession(req, body);
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: "Organizer session required." });
+        return;
+      }
+      const hist = globalThis.__organizerSettings?.icebreakerRoutesHistory;
+      const entry = Array.isArray(hist) && hist.length > 0 ? hist[0] : null;
+      if (!entry || !entry.catalog) {
+        sendJson(res, 400, { ok: false, error: "No published route history to roll back to." });
+        return;
+      }
+      const rollbackErr = validateIcebreakerRoutesCatalog(entry.catalog);
+      if (rollbackErr) {
+        sendJson(res, 500, { ok: false, error: rollbackErr });
+        return;
+      }
+      globalThis.__organizerSettings.icebreakerRoutes = entry.catalog;
+      globalThis.__organizerSettings.icebreakerRoutesHistory = [];
+      globalThis.__organizerSettings.icebreakerRoutesDraft = null;
+      globalThis.__routeCatalog = undefined;
+      persistOrganizerGlobalSettings(sess.organizerKey);
+      sendJson(res, 200, {
+        ok: true,
+        eventId: globalThis.__organizerSettings?.eventInfo?.id || EVENT_ID,
+        organizerKey: sess.organizerKey,
+        activeEventKey: sess.organizer.lastActiveEventKey,
+        events: organizerAuth.listEvents(sess.organizerKey),
+        settings: globalThis.__organizerSettings,
+        diskWriteOk: organizerAuth.diskWriteSucceeded(),
+      });
+      return;
+    }
+
+    if (req.method === "POST" && path === "/organizer/routes/generate") {
+      const sess = requireOrganizerSession(req, body);
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: "Organizer session required." });
+        return;
+      }
+      const selectedTopics = Array.isArray(body.selectedTopics)
+        ? body.selectedTopics
+            .map((entry) => String(entry || "").trim())
+            .filter((entry) => entry.length > 0)
+        : [];
+      if (selectedTopics.length < 1) {
+        sendJson(res, 400, {
+          ok: false,
+          error: "selectedTopics must include at least one route topic.",
+        });
+        return;
+      }
+      const generatedCatalog =
+        (await tryGenerateCatalogWithOpenAI({
+          selectedTopics,
+          crowdCues: body.crowdCues,
+          eventDescription: body.eventDescription,
+          generationStyleNotes: body.generationStyleNotes,
+        })) || buildDeterministicCatalog(selectedTopics);
+      const draftErr = validateIcebreakerRoutesCatalog(generatedCatalog);
+      globalThis.__organizerSettings.icebreakerRoutesDraft = {
+        generatedAtIso: new Date().toISOString(),
+        selectedTopics,
+        catalog: generatedCatalog,
+        validationWarning: draftErr || null,
+      };
+      persistOrganizerGlobalSettings(sess.organizerKey);
+      sendJson(res, 200, {
+        ok: true,
+        source: OPENAI_API_KEY ? "openai_or_fallback" : "deterministic_fallback",
+        selectedTopics,
+        generatedCatalog,
+        draftValidationWarning: draftErr,
+        draftSaved: true,
+        diskWriteOk: organizerAuth.diskWriteSucceeded(),
+      });
       return;
     }
 

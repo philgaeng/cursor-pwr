@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NexusLink - Organizer sign in</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body data-page="organizer-login">
+    <main class="mobile-shell organizer-shell">
+      <header class="app-header">
+        <p class="eyebrow">NexusLink</p>
+        <h1>Organizer</h1>
+        <p class="subtitle">Sign in to manage events, routes, and matching thresholds.</p>
+        <p class="flow-hint">Demo: <strong>organizer@example.com</strong> — password from server env or <strong>changeme</strong>.</p>
+      </header>
+
+      <section class="glass-card">
+        <form id="organizer-login-form" class="stack">
+          <h2>Sign in</h2>
+          <label>Email <input id="org-login-email" type="email" autocomplete="username" required placeholder="you@company.com" /></label>
+          <label>Password <input id="org-login-password" type="password" autocomplete="current-password" required /></label>
+          <button type="submit">Continue to event setup</button>
+        </form>
+
+        <p class="helper" style="margin-top: 14px">
+          <button type="button" id="organizer-toggle-signup" class="ghost-btn">Need an account? Create one</button>
+        </p>
+
+        <div id="organizer-signup-panel" class="stack" hidden style="margin-top: 8px; padding-top: 12px; border-top: 1px solid #e2e8f0">
+          <h2>Create organizer</h2>
+          <form id="organizer-signup-form" class="stack">
+            <label>Display name <input id="org-signup-name" type="text" required placeholder="Alex Rivera" /></label>
+            <label>Email <input id="org-signup-email" type="email" autocomplete="email" required /></label>
+            <label>Password (8+ characters) <input id="org-signup-password" type="password" autocomplete="new-password" required minlength="8" /></label>
+            <button type="submit">Create account</button>
+          </form>
+        </div>
+
+        <p class="helper organizer-entry">
+          <a class="inline-link" href="./index.html">Back to attendee flow</a>
+        </p>
+      </section>
+    </main>
+
+    <footer class="status-bar">
+      <span id="app-status">Enter your organizer credentials.</span>
+    </footer>
+    <script src="/main.js" type="module"></script>
+  </body>
+</html>

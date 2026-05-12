@@ -422,6 +422,29 @@ textarea {
   margin-bottom: 14px;
 }
 
+.organizer-event-bar {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+
+.org-event-label select {
+  width: 100%;
+  min-width: 0;
+  margin-top: 4px;
+}
+
+.organizer-event-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .organizer-nav {
   margin-bottom: 12px;
 }
@@ -499,6 +522,26 @@ textarea {
   gap: 10px;
 }
 
+.organizer-route-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 8px;
+  background: #f8fafc;
+}
+
+.organizer-route-generate {
+  margin-top: 6px;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: #475569;
+}
+
+.organizer-route-generate input {
+  width: auto;
+}
+
 .organizer-checkbox {
   margin: 0;
 }
@@ -539,6 +582,11 @@ textarea {
 
   .organizer-toolbar {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .organizer-event-bar {
+    grid-template-columns: 1fr auto;
+    align-items: end;
   }
 
   .organizer-nav-mobile {

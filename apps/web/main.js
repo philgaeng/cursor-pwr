@@ -11,6 +11,7 @@ const resolveApiBaseUrl = () => {
 
 const API_BASE_URL = resolveApiBaseUrl();
 const STORAGE_KEY = "nexuslink-web-state-v2";
+const ORGANIZER_SESSION_KEY = "nexuslink-organizer-session-token";
 const OFFER_TAG_OPTIONS = [
   "AI Product Strategy",
   "Fundraising Advice",
@@ -95,7 +96,20 @@ const shuffle = (items) => {
 
 /** Returns false if a redirect was triggered (do not bind page handlers). */
 const ensureStep = () => {
-  if (page === "organizer") return true;
+  if (page === "organizer-login") return true;
+  if (page === "organizer") {
+    try {
+      const token = sessionStorage.getItem(ORGANIZER_SESSION_KEY);
+      if (!token) {
+        navigate("./organizer-login.html");
+        return false;
+      }
+    } catch (_error) {
+      navigate("./organizer-login.html");
+      return false;
+    }
+    return true;
+  }
   const hasProfile = Boolean(state.profile && typeof state.profile === "object");
   const responseCount = Array.isArray(state.icebreakerResponses) ? state.icebreakerResponses.length : 0;
   if (page !== "auth" && !state.auth) {
@@ -152,12 +166,21 @@ const mockWave = () =>
 
 const apiFetch = async (path, options = {}) => {
   const url = path.startsWith("http") ? path : `${API_BASE_URL}${path}`;
+  const requestPath = path.startsWith("http") ? new URL(path).pathname : path;
   const method = String(options.method || "GET").toUpperCase();
   const headers = { ...(options.headers || {}) };
   if (method !== "GET" && method !== "HEAD") {
     headers["Content-Type"] = headers["Content-Type"] || "application/json";
   }
   if (state.userId) headers["X-User-Id"] = state.userId;
+  if (/^\/api\/organizer\//.test(requestPath) && !/^\/api\/organizer\/(login|signup)$/.test(requestPath)) {
+    try {
+      const organizerToken = sessionStorage.getItem(ORGANIZER_SESSION_KEY);
+      if (organizerToken) headers.Authorization = `Bearer ${organizerToken}`;
+    } catch (_error) {
+      /* sessionStorage unavailable */
+    }
+  }
 
   const timeoutMs = typeof options.timeoutMs === "number" ? options.timeoutMs : 25000;
   const ctrl = new AbortController();
@@ -1183,7 +1206,11 @@ const defaultOrganizerSettingsShape = () => ({
   questionRoutes: {
     suggestions: ["", "", "", "", "", "", "", ""],
     crowdCues: "",
+    generationStyleNotes: "",
   },
+  icebreakerRoutes: null,
+  icebreakerRoutesDraft: null,
+  icebreakerRoutesHistory: [],
   physicalMeetup: {
     enabled: true,
     spaces: ["Main Hall North", "Coffee Bar", "Side Lounge"],
@@ -1264,12 +1291,92 @@ const deepMerge = (target, source) => {
   return out;
 };
 
+const bindOrganizerLoginPage = () => {
+  const loginForm = document.getElementById("organizer-login-form");
+  const signupForm = document.getElementById("organizer-signup-form");
+  const toggleSignup = document.getElementById("organizer-toggle-signup");
+  const signupPanel = document.getElementById("organizer-signup-panel");
+  if (!loginForm) return;
+
+  if (toggleSignup && signupPanel) {
+    toggleSignup.addEventListener("click", () => {
+      signupPanel.hidden = !signupPanel.hidden;
+    });
+  }
+
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const emailEl = document.getElementById("org-login-email");
+    const passwordEl = document.getElementById("org-login-password");
+    const email = emailEl && typeof emailEl.value === "string" ? emailEl.value.trim() : "";
+    const password = passwordEl && typeof passwordEl.value === "string" ? passwordEl.value : "";
+    if (!email || !password) {
+      setStatus("Email and password are required.", "error");
+      return;
+    }
+    setStatus("Signing in…", "info");
+    try {
+      const payload = await apiFetch("/api/organizer/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      if (payload.token) {
+        try {
+          sessionStorage.setItem(ORGANIZER_SESSION_KEY, payload.token);
+        } catch (_error) {
+          setStatus("Could not store session in this browser.", "error");
+          return;
+        }
+      }
+      setStatus("Signed in.", "success");
+      navigate("./organizer.html");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Login failed.", "error");
+    }
+  });
+
+  if (signupForm) {
+    signupForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const name = document.getElementById("org-signup-name")?.value?.trim();
+      const email = document.getElementById("org-signup-email")?.value?.trim();
+      const password = document.getElementById("org-signup-password")?.value || "";
+      if (!name || !email || !password) {
+        setStatus("Name, email, and password are required.", "error");
+        return;
+      }
+      if (password.length < 8) {
+        setStatus("Password must be at least 8 characters.", "error");
+        return;
+      }
+      setStatus("Creating account…", "info");
+      try {
+        await apiFetch("/api/organizer/signup", {
+          method: "POST",
+          body: JSON.stringify({ name, email, password }),
+        });
+        const loginEmail = document.getElementById("org-login-email");
+        const loginPassword = document.getElementById("org-login-password");
+        if (loginEmail) loginEmail.value = email;
+        if (loginPassword) loginPassword.value = password;
+        if (signupPanel) signupPanel.hidden = true;
+        setStatus("Account created. Press continue to sign in.", "success");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Signup failed.", "error");
+      }
+    });
+  }
+};
+
 const bindOrganizerPage = () => {
   const form = document.getElementById("organizer-form");
   const reloadBtn = document.getElementById("organizer-reload");
   const jsonArea = document.getElementById("org-settings-json");
   const jsonRefreshBtn = document.getElementById("org-json-refresh");
   const jsonApplyBtn = document.getElementById("org-json-apply");
+  const generateRoutesBtn = document.getElementById("org-generate-routes");
+  const publishRoutesBtn = document.getElementById("org-publish-routes");
+  const rollbackRoutesBtn = document.getElementById("org-rollback-routes");
   const desktopTabButtons = Array.from(document.querySelectorAll(".organizer-tab-btn"));
   const mobileLinks = Array.from(document.querySelectorAll(".organizer-mobile-link"));
   const sectionPanels = Array.from(document.querySelectorAll("[data-organizer-section]"));
@@ -1280,6 +1387,51 @@ const bindOrganizerPage = () => {
   const getEl = (id) => document.getElementById(id);
   const ORGANIZER_SECTION_KEY = "nexuslink-organizer-active-section";
   let activeSectionId = "section-organizer";
+
+  const eventSelect = getEl("org-event-select");
+  const eventNewBtn = getEl("org-event-new");
+  const eventCloneBtn = getEl("org-event-clone");
+  const logoutBtn = getEl("org-organizer-logout");
+  let eventSelectProgrammatic = false;
+
+  const diskMessage = (payload, base, tone = "success") => {
+    const warn = payload && payload.diskWriteOk === false;
+    const msg = warn
+      ? `${base} Note: organizer JSON store could not write to disk; changes may not persist on this host.`
+      : base;
+    setStatus(msg, warn ? "error" : tone);
+  };
+
+  const applyEventsToSwitcher = (events, activeEventKey) => {
+    if (!(eventSelect instanceof HTMLSelectElement)) return;
+    eventSelectProgrammatic = true;
+    const list = Array.isArray(events) ? events : [];
+    eventSelect.innerHTML = "";
+    list.forEach((entry) => {
+      if (!entry || !entry.event_key) return;
+      const opt = document.createElement("option");
+      opt.value = entry.event_key;
+      opt.textContent = entry.name || entry.event_key;
+      if (entry.event_key === activeEventKey) opt.selected = true;
+      eventSelect.appendChild(opt);
+    });
+    if (activeEventKey && list.some((e) => e && e.event_key === activeEventKey)) {
+      eventSelect.value = activeEventKey;
+    }
+    eventSelectProgrammatic = false;
+  };
+
+  const applyServerOrganizerPayload = (payload) => {
+    if (!payload || typeof payload !== "object") return;
+    if (payload.settings) {
+      lastLoaded = payload.settings;
+      applyToForm(lastLoaded);
+      refreshJsonFromSettings(lastLoaded);
+    }
+    if (Array.isArray(payload.events) && payload.activeEventKey != null) {
+      applyEventsToSwitcher(payload.events, payload.activeEventKey);
+    }
+  };
 
   const applyToForm = (raw) => {
     const s = deepMerge(defaultOrganizerSettingsShape(), raw || {});
@@ -1314,6 +1466,15 @@ const bindOrganizerPage = () => {
       if (input) input.value = suggestions[i] || "";
     }
     getEl("org-crowd-cues").value = s.questionRoutes?.crowdCues || "";
+    const genStyle = getEl("org-route-gen-style");
+    if (genStyle) genStyle.value = s.questionRoutes?.generationStyleNotes || "";
+    const routesCatalogEl = getEl("org-icebreaker-routes-json");
+    if (routesCatalogEl) {
+      routesCatalogEl.value =
+        s.icebreakerRoutes && typeof s.icebreakerRoutes === "object"
+          ? JSON.stringify(s.icebreakerRoutes, null, 2)
+          : "";
+    }
     const meetupSpaces = Array.isArray(s.physicalMeetup?.spaces) ? s.physicalMeetup.spaces : [];
     const meetupSigns = Array.isArray(s.physicalMeetup?.signs?.options) ? s.physicalMeetup.signs.options : [];
     getEl("org-meetup-enabled").checked = s.physicalMeetup?.enabled !== false;
@@ -1422,6 +1583,14 @@ const bindOrganizerPage = () => {
     return Number.isFinite(v) ? v : fallback;
   };
 
+  const parseIcebreakerRoutesTextarea = () => {
+    const el = getEl("org-icebreaker-routes-json");
+    if (!el) return null;
+    const raw = String(el.value || "").trim();
+    if (!raw) return null;
+    return JSON.parse(raw);
+  };
+
   const collectFromForm = (previous) => {
     const base = deepMerge(defaultOrganizerSettingsShape(), previous || {});
     const freebieLines = getEl("org-freebies-links")
@@ -1429,6 +1598,12 @@ const bindOrganizerPage = () => {
       .map((line) => line.trim())
       .filter(Boolean);
 
+    let icebreakerRoutes;
+    try {
+      icebreakerRoutes = parseIcebreakerRoutesTextarea();
+    } catch (_e) {
+      throw new Error("Published icebreaker routes JSON is invalid. Fix it or clear the field.");
+    }
     const suggestions = [];
     for (let i = 0; i < 8; i += 1) {
       suggestions.push((getEl(`org-route-${i}`).value || "").trim());
@@ -1477,7 +1652,9 @@ const bindOrganizerPage = () => {
       questionRoutes: {
         suggestions,
         crowdCues: getEl("org-crowd-cues").value,
+        generationStyleNotes: getEl("org-route-gen-style") ? getEl("org-route-gen-style").value.trim() : "",
       },
+      icebreakerRoutes,
       physicalMeetup: {
         enabled: getEl("org-meetup-enabled").checked,
         spaces: meetupSpaces.length > 0 ? meetupSpaces : base.physicalMeetup.spaces,
@@ -1570,6 +1747,18 @@ const bindOrganizerPage = () => {
     };
   };
 
+  const selectedRouteSlots = () => {
+    const rows = [];
+    for (let i = 0; i < 8; i += 1) {
+      const input = getEl(`org-route-${i}`);
+      const checkbox = getEl(`org-route-generate-${i}`);
+      if (!input || !checkbox) continue;
+      if (!checkbox.checked) continue;
+      rows.push({ index: i, topic: String(input.value || "").trim() });
+    }
+    return rows.filter((entry) => entry.topic.length > 0);
+  };
+
   const refreshJsonFromSettings = (settings) => {
     if (!(jsonArea instanceof HTMLTextAreaElement)) return;
     jsonArea.value = JSON.stringify(settings, null, 2);
@@ -1583,7 +1772,8 @@ const bindOrganizerPage = () => {
       lastLoaded = payload.settings;
       applyToForm(lastLoaded);
       refreshJsonFromSettings(lastLoaded);
-      setStatus("Settings loaded.", "success");
+      applyEventsToSwitcher(payload.events, payload.activeEventKey);
+      diskMessage(payload, "Settings loaded.", "success");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Failed to load settings.", "error");
     }
@@ -1593,9 +1783,13 @@ const bindOrganizerPage = () => {
 
   if (jsonRefreshBtn) {
     jsonRefreshBtn.addEventListener("click", () => {
-      const settings = collectFromForm(lastLoaded || defaultOrganizerSettingsShape());
-      refreshJsonFromSettings(settings);
-      setStatus("JSON refreshed from current form values.", "success");
+      try {
+        const settings = collectFromForm(lastLoaded || defaultOrganizerSettingsShape());
+        refreshJsonFromSettings(settings);
+        setStatus("JSON refreshed from current form values.", "success");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Could not build JSON from form.", "error");
+      }
     });
   }
 
@@ -1614,22 +1808,194 @@ const bindOrganizerPage = () => {
     });
   }
 
+  if (generateRoutesBtn) {
+    generateRoutesBtn.addEventListener("click", async () => {
+      const selected = selectedRouteSlots();
+      if (selected.length < 1) {
+        setStatus("Select at least one route checkbox with a route topic.", "error");
+        return;
+      }
+      generateRoutesBtn.disabled = true;
+      setStatus("Generating selected routes JSON...", "info");
+      try {
+        const payload = await apiFetch("/api/organizer/routes/generate", {
+          method: "POST",
+          body: JSON.stringify({
+            selectedTopics: selected.map((entry) => entry.topic),
+            crowdCues: getEl("org-crowd-cues").value,
+            eventDescription: getEl("org-event-desc").value,
+            generationStyleNotes: getEl("org-route-gen-style") ? getEl("org-route-gen-style").value : "",
+          }),
+        });
+        const generatedCatalog = payload.generatedCatalog || {};
+        const routes = Array.isArray(generatedCatalog.routes) ? generatedCatalog.routes : [];
+        selected.forEach((slot, idx) => {
+          const generatedRoute = routes[idx];
+          if (!generatedRoute || !generatedRoute.routeId) return;
+          const input = getEl(`org-route-${slot.index}`);
+          if (input) input.value = String(generatedRoute.routeId);
+        });
+        const routesCatalogEl = getEl("org-icebreaker-routes-json");
+        if (routesCatalogEl) {
+          routesCatalogEl.value = JSON.stringify(generatedCatalog, null, 2);
+        }
+        const warn = payload.draftValidationWarning;
+        const diskWarn = payload.diskWriteOk === false;
+        setActiveSection("section-routes");
+        const baseMsg = warn
+          ? `Generated ${routes.length} route(s). Draft saved; validation note: ${warn}`
+          : `Generated ${routes.length} route definition${routes.length === 1 ? "" : "s"}. Draft saved on server — review JSON, then Publish or Save.`;
+        const msg =
+          diskWarn && !warn
+            ? `${baseMsg} Note: disk store unavailable; draft may not persist.`
+            : diskWarn && warn
+              ? `${baseMsg} Disk store may be unavailable.`
+              : baseMsg;
+        setStatus(msg, warn || diskWarn ? "error" : "success");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Route generation failed.", "error");
+      } finally {
+        generateRoutesBtn.disabled = false;
+      }
+    });
+  }
+
+  if (publishRoutesBtn) {
+    publishRoutesBtn.addEventListener("click", async () => {
+      let catalog;
+      try {
+        catalog = parseIcebreakerRoutesTextarea();
+      } catch (_e) {
+        setStatus(
+          "Fix the icebreaker routes JSON before publishing. Clear the field completely if you intend to publish the last server-generated draft instead.",
+          "error"
+        );
+        return;
+      }
+      publishRoutesBtn.disabled = true;
+      setStatus("Publishing routes…", "info");
+      try {
+        const body = catalog && typeof catalog === "object" ? { catalog } : {};
+        const result = await apiFetch("/api/organizer/routes/publish", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        applyServerOrganizerPayload(result);
+        diskMessage(result, "Routes published. Attendees will receive this catalog on the next route load.", "success");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Publish failed.", "error");
+      } finally {
+        publishRoutesBtn.disabled = false;
+      }
+    });
+  }
+
+  if (rollbackRoutesBtn) {
+    rollbackRoutesBtn.addEventListener("click", async () => {
+      rollbackRoutesBtn.disabled = true;
+      setStatus("Rolling back routes…", "info");
+      try {
+        const result = await apiFetch("/api/organizer/routes/rollback", { method: "POST", body: "{}" });
+        applyServerOrganizerPayload(result);
+        diskMessage(result, "Rolled back to the previous published route catalog.", "success");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Rollback failed.", "error");
+      } finally {
+        rollbackRoutesBtn.disabled = false;
+      }
+    });
+  }
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const settings = collectFromForm(lastLoaded || defaultOrganizerSettingsShape());
+    let settings;
+    try {
+      settings = collectFromForm(lastLoaded || defaultOrganizerSettingsShape());
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Invalid form data.", "error");
+      return;
+    }
     try {
       const result = await apiFetch("/api/organizer/settings", {
         method: "POST",
         body: JSON.stringify({ settings }),
       });
-      lastLoaded = result.settings;
-      applyToForm(lastLoaded);
-      refreshJsonFromSettings(lastLoaded);
-      setStatus("Event settings saved.", "success");
+      applyServerOrganizerPayload(result);
+      diskMessage(result, "Event settings saved.", "success");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Save failed.", "error");
     }
   });
+
+  if (eventSelect instanceof HTMLSelectElement) {
+    eventSelect.addEventListener("change", async () => {
+      if (eventSelectProgrammatic) return;
+      const eventKey = eventSelect.value;
+      if (!eventKey) return;
+      setStatus("Switching event…", "info");
+      try {
+        const result = await apiFetch("/api/organizer/events/select", {
+          method: "POST",
+          body: JSON.stringify({ eventKey }),
+        });
+        applyServerOrganizerPayload(result);
+        diskMessage(result, "Active event updated.", "success");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Could not switch event.", "error");
+        await load();
+      }
+    });
+  }
+
+  if (eventNewBtn) {
+    eventNewBtn.addEventListener("click", async () => {
+      const name = window.prompt("Name for the new event?", "New event");
+      if (name == null) return;
+      const trimmed = String(name).trim();
+      if (!trimmed) return;
+      setStatus("Creating event…", "info");
+      try {
+        const result = await apiFetch("/api/organizer/events", {
+          method: "POST",
+          body: JSON.stringify({ name: trimmed }),
+        });
+        applyServerOrganizerPayload(result);
+        diskMessage(result, "New event created and selected.", "success");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Create event failed.", "error");
+      }
+    });
+  }
+
+  if (eventCloneBtn) {
+    eventCloneBtn.addEventListener("click", async () => {
+      if (!window.confirm("Clone the active event into a new draft?")) return;
+      setStatus("Cloning event…", "info");
+      try {
+        const result = await apiFetch("/api/organizer/events/clone", { method: "POST", body: "{}" });
+        applyServerOrganizerPayload(result);
+        diskMessage(result, "Event cloned.", "success");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Clone failed.", "error");
+      }
+    });
+  }
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", async () => {
+      try {
+        await apiFetch("/api/organizer/logout", { method: "POST", body: "{}" });
+      } catch (_error) {
+        /* still clear local session */
+      }
+      try {
+        sessionStorage.removeItem(ORGANIZER_SESSION_KEY);
+      } catch (_error) {
+        /* ignore */
+      }
+      navigate("./organizer-login.html");
+    });
+  }
 
   bindSectionNav();
   load();
@@ -1643,4 +2009,5 @@ if (ensureStep()) {
   if (page === "queue") bindQueuePage();
   if (page === "vault") bindVaultPage();
   if (page === "organizer") bindOrganizerPage();
+  if (page === "organizer-login") bindOrganizerLoginPage();
 }

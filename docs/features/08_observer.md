@@ -15,6 +15,8 @@ Define the organizer-facing operating flow for configuring, monitoring, and stee
 ## Scope
 
 - Organizer portal information architecture and navigation behavior.
+- Organizer authentication entry (login page) before organizer settings access.
+- Multi-event management for one organizer account.
 - Organizer settings lifecycle: load, edit by forms, edit by raw JSON, validate, save.
 - Runtime observer actions (waves, meetup logistics visibility, QA checkpoints).
 - Documentation source for organizer-specific behavior across specs `03`, `04`, `05`, and `07`.
@@ -32,6 +34,7 @@ Define the organizer-facing operating flow for configuring, monitoring, and stee
 
 ## Section Map (Organizer Portal)
 
+- Organizer login and organizer home/event switcher.
 - Organizer credentials and social links.
 - Event details.
 - Freebies.
@@ -49,6 +52,39 @@ Define the organizer-facing operating flow for configuring, monitoring, and stee
 - "Refresh JSON from form" serializes current form state.
 - "Apply JSON to form" parses JSON and rehydrates fields.
 - Final persisted payload is still validated on save by backend.
+
+## Organizer Data Container (Proposed)
+
+Organizer data should become organizer-centric with event-scoped settings and routes:
+
+```json
+{
+  "organizer": {
+    "key": "org_xxxx",
+    "details": {
+      "email": "owner@example.com",
+      "linkedin": "https://linkedin.com/in/owner",
+      "privateKey": "..."
+    },
+    "events": [
+      {
+        "event_key": "xx1",
+        "details": {},
+        "settings": {},
+        "icebreaker_routes": {}
+      },
+      {
+        "event_key": "xx2",
+        "details": {},
+        "settings": {},
+        "icebreaker_routes": {}
+      }
+    ]
+  }
+}
+```
+
+This structure is a proposal for pre-implementation alignment and should be finalized in `10_organizer_auth_and_event_store`.
 
 ## Observer Responsibilities
 
@@ -73,7 +109,11 @@ Use this section as a working questionnaire. Replace `[ ]` with `[x]` and add yo
 
 - [ ] Should some organizer sections be role-restricted (for example, only owner can edit privacy/scoring)?
   - Answer:
-- [ ] Should desktop tabs support deep-link URLs (for example `?section=matching`)?
+- [x] Should desktop tabs support deep-link URLs (for example `?section=matching`)?
+  - Answer: yes
+- [ ] Should organizer always hit login page first before opening organizer settings?
+  - Answer:
+- [ ] Should organizer support passwordless magic-link, password login, or both for MVP?
   - Answer:
 - [ ] Should mobile menu stay open after selection, or auto-close (currently auto-close)?
   - Answer:
@@ -101,4 +141,13 @@ Use this section as a working questionnaire. Replace `[ ]` with `[x]` and add yo
 - [ ] Confirm which spec is source of truth for organizer defaults (this file vs each feature spec).
   - Answer:
 - [ ] Confirm mandatory pre-event checklist for organizer before attendees onboard.
+  - Answer:
+
+### E) Organizer Event Storage
+
+- [ ] Confirm `organizer.key` format and generation strategy.
+  - Answer:
+- [ ] Confirm if `organizer.details.privateKey` is required in DB/config, or should be stored separately in secret manager only.
+  - Answer:
+- [ ] Confirm max number of events per organizer in MVP and whether event archiving is required.
   - Answer:

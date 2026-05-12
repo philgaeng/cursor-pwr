@@ -17,6 +17,17 @@
 
       <section class="glass-card">
         <div class="organizer-toolbar">
+          <div class="organizer-event-bar" id="org-event-bar">
+            <label class="org-event-label"
+              >Active event
+              <select id="org-event-select" aria-label="Active event"></select>
+            </label>
+            <div class="organizer-event-actions">
+              <button type="button" id="org-event-new" class="ghost-btn">New event</button>
+              <button type="button" id="org-event-clone" class="ghost-btn">Clone active</button>
+              <button type="button" id="org-organizer-logout" class="ghost-btn">Sign out</button>
+            </div>
+          </div>
           <a class="link-btn ghost-btn" href="./index.html">Back to attendee flow</a>
           <button type="button" id="organizer-reload" class="ghost-btn">Reload from server</button>
         </div>
@@ -90,16 +101,35 @@
             <legend>Question routes (8 suggestions)</legend>
             <p class="helper organizer-fieldset-hint">Free-text labels or route ids; must stay 8 entries for validation.</p>
             <div class="organizer-route-grid">
-              <label>Route 1 <input id="org-route-0" type="text" required /></label>
-              <label>Route 2 <input id="org-route-1" type="text" required /></label>
-              <label>Route 3 <input id="org-route-2" type="text" required /></label>
-              <label>Route 4 <input id="org-route-3" type="text" required /></label>
-              <label>Route 5 <input id="org-route-4" type="text" required /></label>
-              <label>Route 6 <input id="org-route-5" type="text" required /></label>
-              <label>Route 7 <input id="org-route-6" type="text" required /></label>
-              <label>Route 8 <input id="org-route-7" type="text" required /></label>
+              <label class="organizer-route-item">Route 1 <input id="org-route-0" type="text" required /><span class="organizer-route-generate"><input id="org-route-generate-0" type="checkbox" checked /> Generate</span></label>
+              <label class="organizer-route-item">Route 2 <input id="org-route-1" type="text" required /><span class="organizer-route-generate"><input id="org-route-generate-1" type="checkbox" checked /> Generate</span></label>
+              <label class="organizer-route-item">Route 3 <input id="org-route-2" type="text" required /><span class="organizer-route-generate"><input id="org-route-generate-2" type="checkbox" checked /> Generate</span></label>
+              <label class="organizer-route-item">Route 4 <input id="org-route-3" type="text" required /><span class="organizer-route-generate"><input id="org-route-generate-3" type="checkbox" checked /> Generate</span></label>
+              <label class="organizer-route-item">Route 5 <input id="org-route-4" type="text" required /><span class="organizer-route-generate"><input id="org-route-generate-4" type="checkbox" checked /> Generate</span></label>
+              <label class="organizer-route-item">Route 6 <input id="org-route-5" type="text" required /><span class="organizer-route-generate"><input id="org-route-generate-5" type="checkbox" checked /> Generate</span></label>
+              <label class="organizer-route-item">Route 7 <input id="org-route-6" type="text" required /><span class="organizer-route-generate"><input id="org-route-generate-6" type="checkbox" checked /> Generate</span></label>
+              <label class="organizer-route-item">Route 8 <input id="org-route-7" type="text" required /><span class="organizer-route-generate"><input id="org-route-generate-7" type="checkbox" checked /> Generate</span></label>
             </div>
-            <label>Crowd cues (for agents / auto routes) <textarea id="org-crowd-cues" rows="3" placeholder="Themes, tone, off-limits"></textarea></label>
+            <label>Crowd cues (for route generation &amp; agents)
+              <textarea id="org-crowd-cues" rows="5" placeholder="Audience, tone, boundaries, off-limits, one example route style…"></textarea>
+            </label>
+            <p class="helper organizer-fieldset-hint">
+              Used when generating routes: who is in the room, how playful or formal prompts should be, topics to avoid, and optionally one short example of the kind of questions you want.
+            </p>
+            <label>Generation style notes (optional, free text)
+              <textarea id="org-route-gen-style" rows="2" placeholder="e.g. short prompts, founder-friendly, no dating topics"></textarea>
+            </label>
+            <button type="button" id="org-generate-routes" class="ghost-btn">Generate selected routes JSON</button>
+            <p class="helper organizer-fieldset-hint">
+              Generation is saved as a server draft. Edit the JSON below, then publish when validated — or use Save event settings to save everything at once.
+            </p>
+            <label>Published / validated icebreaker route catalog (JSON)
+              <textarea id="org-icebreaker-routes-json" rows="10" spellcheck="false" placeholder="{} — leave empty to use the default bundled catalog"></textarea>
+            </label>
+            <div class="organizer-json-actions">
+              <button type="button" id="org-publish-routes" class="ghost-btn">Publish routes to attendees</button>
+              <button type="button" id="org-rollback-routes" class="ghost-btn">Rollback to previous published</button>
+            </div>
           </fieldset>
 
           <fieldset class="organizer-fieldset organizer-section" id="section-meetup" data-organizer-section>
