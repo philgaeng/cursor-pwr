@@ -811,7 +811,17 @@ module.exports = async (req, res) => {
       return;
     }
 
-    await ensureApiInitialized();
+    try {
+      await ensureApiInitialized();
+    } catch (initErr) {
+      console.error("[api] ensureApiInitialized failed:", initErr);
+      sendJson(res, 503, {
+        ok: false,
+        error: "API initialization failed (often DB SSL, IPv4 vs IPv6, or missing migrations).",
+        detail: initErr instanceof Error ? initErr.message : String(initErr),
+      });
+      return;
+    }
 
     if (req.method === "GET" && path === "/tags/catalog") {
       sendJson(res, 200, { ok: true, eventId: EVENT_ID, tags: GLOBAL_TAG_CATALOG });

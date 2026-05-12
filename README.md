@@ -28,6 +28,8 @@ When **`POSTGRES_URL`** or **`POSTGRES_PRISMA_URL`** is set (for example via the
 
 Run migrations against your Supabase project from the repo root: `npx supabase db push` (after `npx supabase link`).
 
+If Production logs show DB connection errors from Vercel: use the **Session pooler** or **Transaction pooler** URI from Supabase (**Connect**), not always the direct `db.<ref>.supabase.co` URL — some networks are IPv4-only while direct connections default to IPv6. Ensure migrations have been applied so `nl_*` tables exist.
+
 ## Docs
 
 - `docs/MVP.md` — scope, Vercel-only runtime, acceptance criteria
