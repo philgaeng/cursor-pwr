@@ -66,13 +66,31 @@
           <fieldset class="organizer-fieldset organizer-section" id="section-organizer" data-organizer-section>
             <legend>Organizer</legend>
             <label>Organizer email (attendance / exports) <input id="org-email" type="email" required placeholder="you@company.com" /></label>
-            <label class="checkbox-row organizer-checkbox"
-              ><input id="org-google-enabled" type="checkbox" /> Enable Google Sheets export fields</label
-            >
-            <label>Google service account email <input id="org-google-client-email" type="text" autocomplete="off" placeholder="svc@project.iam.gserviceaccount.com" /></label>
-            <label>Private key (paste PEM; keep server-side only in production) <textarea id="org-google-private-key" rows="3" placeholder="-----BEGIN PRIVATE KEY-----"></textarea></label>
-            <label>Spreadsheet ID <input id="org-google-spreadsheet-id" type="text" autocomplete="off" /></label>
-            <label>Drive folder path or ID <input id="org-google-folder-path" type="text" autocomplete="off" placeholder="folder id or path" /></label>
+            <p class="organizer-sublegend">Route generation (LLM)</p>
+            <p class="helper organizer-fieldset-hint">
+              Choose which provider the API should use for icebreaker route JSON (implementation: spec 11 — LLM integration). Until then, the server may use its own env key or a deterministic fallback. Keys are stored in event settings — treat them as secrets.
+            </p>
+            <label>LLM provider
+              <select id="org-llm-provider" autocomplete="off">
+                <option value="none">None (server default / deterministic)</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic (Claude)</option>
+                <option value="gemini">Google (Gemini)</option>
+                <option value="deepseek">DeepSeek</option>
+              </select>
+            </label>
+            <div id="org-llm-row-openai" class="org-llm-cred-row" hidden>
+              <label>OpenAI API key <input id="org-llm-key-openai" type="password" autocomplete="new-password" placeholder="sk-…" /></label>
+            </div>
+            <div id="org-llm-row-anthropic" class="org-llm-cred-row" hidden>
+              <label>Anthropic API key <input id="org-llm-key-anthropic" type="password" autocomplete="new-password" placeholder="sk-ant-…" /></label>
+            </div>
+            <div id="org-llm-row-gemini" class="org-llm-cred-row" hidden>
+              <label>Gemini API key <input id="org-llm-key-gemini" type="password" autocomplete="new-password" /></label>
+            </div>
+            <div id="org-llm-row-deepseek" class="org-llm-cred-row" hidden>
+              <label>DeepSeek API key <input id="org-llm-key-deepseek" type="password" autocomplete="new-password" /></label>
+            </div>
             <label>Instagram <input id="org-social-ig" type="text" placeholder="URL or handle" /></label>
             <label>WhatsApp <input id="org-social-wa" type="text" placeholder="Link or number" /></label>
             <label>LinkedIn <input id="org-social-li" type="text" placeholder="Profile URL" /></label>
@@ -119,9 +137,11 @@
             <label>Generation style notes (optional, free text)
               <textarea id="org-route-gen-style" rows="2" placeholder="e.g. short prompts, founder-friendly, no dating topics"></textarea>
             </label>
-            <button type="button" id="org-generate-routes" class="ghost-btn">Generate selected routes JSON</button>
+            <div class="organizer-generate-routes-actions">
+              <button type="button" id="org-generate-routes">Generate routes</button>
+            </div>
             <p class="helper organizer-fieldset-hint">
-              Generation is saved as a server draft. Edit the JSON below, then publish when validated — or use Save event settings to save everything at once.
+              Uses checked route topics and crowd cues. Saved as a server draft; edit JSON below, then Publish or Save event settings.
             </p>
             <label>Published / validated icebreaker route catalog (JSON)
               <textarea id="org-icebreaker-routes-json" rows="10" spellcheck="false" placeholder="{} — leave empty to use the default bundled catalog"></textarea>

@@ -60,6 +60,16 @@ const buildDefaultOrganizerSettings = () => ({
       whatsapp: "",
       linkedin: "",
     },
+    /** Route catalog LLM (spec 11 reads this; until then server env / deterministic fallback). */
+    llm: {
+      provider: "none",
+      apiKeys: {
+        openai: "",
+        anthropic: "",
+        gemini: "",
+        deepseek: "",
+      },
+    },
   },
   eventInfo: {
     id: EVENT_ID,

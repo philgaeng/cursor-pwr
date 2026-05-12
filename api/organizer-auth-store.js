@@ -147,6 +147,25 @@ const ensureEventSettingsShape = (settings) => {
   if (!Array.isArray(settings.icebreakerRoutesHistory)) settings.icebreakerRoutesHistory = [];
   if (!("icebreakerRoutesDraft" in settings)) settings.icebreakerRoutesDraft = null;
   if (!("icebreakerRoutes" in settings)) settings.icebreakerRoutes = null;
+  if (!settings.organizer || typeof settings.organizer !== "object") settings.organizer = {};
+  if (!settings.organizer.llm || typeof settings.organizer.llm !== "object") {
+    settings.organizer.llm = {
+      provider: "none",
+      apiKeys: { openai: "", anthropic: "", gemini: "", deepseek: "" },
+    };
+  } else {
+    const k = settings.organizer.llm.apiKeys && typeof settings.organizer.llm.apiKeys === "object" ? settings.organizer.llm.apiKeys : {};
+    settings.organizer.llm.apiKeys = {
+      openai: typeof k.openai === "string" ? k.openai : "",
+      anthropic: typeof k.anthropic === "string" ? k.anthropic : "",
+      gemini: typeof k.gemini === "string" ? k.gemini : "",
+      deepseek: typeof k.deepseek === "string" ? k.deepseek : "",
+    };
+    const allowed = new Set(["none", "openai", "anthropic", "gemini", "deepseek"]);
+    if (!allowed.has(String(settings.organizer.llm.provider || ""))) {
+      settings.organizer.llm.provider = "none";
+    }
+  }
   return settings;
 };
 

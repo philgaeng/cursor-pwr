@@ -552,9 +552,16 @@ textarea {
   color: #334155;
 }
 
-.organizer-json-actions {
-  display: grid;
-  gap: 8px;
+.organizer-generate-routes-actions {
+  margin-top: 10px;
+}
+
+.organizer-generate-routes-actions button {
+  width: 100%;
+}
+
+.org-llm-cred-row {
+  margin-top: 4px;
 }
 
 .inline-link {

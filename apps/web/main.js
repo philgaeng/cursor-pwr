@@ -1188,6 +1188,15 @@ const defaultOrganizerSettingsShape = () => ({
       whatsapp: "",
       linkedin: "",
     },
+    llm: {
+      provider: "none",
+      apiKeys: {
+        openai: "",
+        anthropic: "",
+        gemini: "",
+        deepseek: "",
+      },
+    },
   },
   eventInfo: {
     id: "demo-event-2026",
@@ -1433,17 +1442,38 @@ const bindOrganizerPage = () => {
     }
   };
 
+  const syncLlmCredentialVisibility = () => {
+    const sel = getEl("org-llm-provider");
+    const p = sel instanceof HTMLSelectElement && sel.value ? sel.value : "none";
+    ["openai", "anthropic", "gemini", "deepseek"].forEach((key) => {
+      const row = getEl(`org-llm-row-${key}`);
+      if (row) row.hidden = p !== key;
+    });
+  };
+
   const applyToForm = (raw) => {
     const s = deepMerge(defaultOrganizerSettingsShape(), raw || {});
     const eventIdEl = getEl("org-event-id");
     if (eventIdEl) eventIdEl.textContent = s.eventInfo?.id || "—";
 
     getEl("org-email").value = s.organizer?.creds?.email || "";
-    getEl("org-google-enabled").checked = Boolean(s.organizer?.creds?.google?.enabled);
-    getEl("org-google-client-email").value = s.organizer?.creds?.google?.clientEmail || "";
-    getEl("org-google-private-key").value = s.organizer?.creds?.google?.privateKey || "";
-    getEl("org-google-spreadsheet-id").value = s.organizer?.creds?.google?.spreadsheetId || "";
-    getEl("org-google-folder-path").value = s.organizer?.creds?.google?.folderPath || "";
+
+    const llm = s.organizer?.llm && typeof s.organizer.llm === "object" ? s.organizer.llm : {};
+    const keys = llm.apiKeys && typeof llm.apiKeys === "object" ? llm.apiKeys : {};
+    const provSel = getEl("org-llm-provider");
+    if (provSel instanceof HTMLSelectElement) {
+      const allowed = new Set(["none", "openai", "anthropic", "gemini", "deepseek"]);
+      provSel.value = allowed.has(String(llm.provider)) ? String(llm.provider) : "none";
+    }
+    const openaiKey = getEl("org-llm-key-openai");
+    const anthropicKey = getEl("org-llm-key-anthropic");
+    const geminiKey = getEl("org-llm-key-gemini");
+    const deepseekKey = getEl("org-llm-key-deepseek");
+    if (openaiKey) openaiKey.value = keys.openai || "";
+    if (anthropicKey) anthropicKey.value = keys.anthropic || "";
+    if (geminiKey) geminiKey.value = keys.gemini || "";
+    if (deepseekKey) deepseekKey.value = keys.deepseek || "";
+    syncLlmCredentialVisibility();
 
     getEl("org-social-ig").value = s.organizer?.socialMedia?.instagram || "";
     getEl("org-social-wa").value = s.organizer?.socialMedia?.whatsapp || "";
@@ -1621,12 +1651,26 @@ const bindOrganizerPage = () => {
       organizer: {
         creds: {
           email: getEl("org-email").value.trim(),
-          google: {
-            enabled: getEl("org-google-enabled").checked,
-            clientEmail: getEl("org-google-client-email").value.trim(),
-            privateKey: getEl("org-google-private-key").value,
-            spreadsheetId: getEl("org-google-spreadsheet-id").value.trim(),
-            folderPath: getEl("org-google-folder-path").value.trim(),
+          google: base.organizer?.creds?.google || {
+            enabled: false,
+            clientEmail: "",
+            privateKey: "",
+            spreadsheetId: "",
+            folderPath: "",
+          },
+        },
+        llm: {
+          provider: (() => {
+            const sel = getEl("org-llm-provider");
+            const v = sel instanceof HTMLSelectElement ? sel.value : "none";
+            const allowed = new Set(["none", "openai", "anthropic", "gemini", "deepseek"]);
+            return allowed.has(v) ? v : "none";
+          })(),
+          apiKeys: {
+            openai: getEl("org-llm-key-openai")?.value?.trim() || "",
+            anthropic: getEl("org-llm-key-anthropic")?.value?.trim() || "",
+            gemini: getEl("org-llm-key-gemini")?.value?.trim() || "",
+            deepseek: getEl("org-llm-key-deepseek")?.value?.trim() || "",
           },
         },
         socialMedia: {
@@ -1781,6 +1825,11 @@ const bindOrganizerPage = () => {
 
   if (reloadBtn) reloadBtn.addEventListener("click", () => load());
 
+  const llmProviderSel = getEl("org-llm-provider");
+  if (llmProviderSel instanceof HTMLSelectElement) {
+    llmProviderSel.addEventListener("change", () => syncLlmCredentialVisibility());
+  }
+
   if (jsonRefreshBtn) {
     jsonRefreshBtn.addEventListener("click", () => {
       try {
@@ -1816,7 +1865,7 @@ const bindOrganizerPage = () => {
         return;
       }
       generateRoutesBtn.disabled = true;
-      setStatus("Generating selected routes JSON...", "info");
+      setStatus("Generating routes…", "info");
       try {
         const payload = await apiFetch("/api/organizer/routes/generate", {
           method: "POST",
