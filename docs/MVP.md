@@ -70,3 +70,7 @@ Minimum routes used by the current web app:
 
 - **Auth beyond MVP:** whether attendee flows move to Supabase Auth (or another IdP) vs. keeping stub/demo auth on the handler while Postgres stores state.
 - Contract formalization: whether to regenerate `packages/shared` types from a single OpenAPI/schema for the handler.
+
+## Resilience and persistence roadmap
+
+Engineering backlog for serverless + Postgres hardening (sessions, DB wiring, env parity): [`docs/features/12_runtime_resilience.md`](features/12_runtime_resilience.md).

@@ -771,6 +771,15 @@ const bindQuestionsPage = () => {
     if (state.icebreakerResponses.length < REQUIRED_ASSIGNED_ROUTES) {
       routeIndex = findAssignedRouteIndex(assignedRoutes, state.icebreakerResponses);
       const nextRoute = assignedRoutes[routeIndex];
+      if (!nextRoute) {
+        pill.textContent = "Error";
+        showStageHint(
+          "Could not open the next route. Tap “Clear saved route progress” and try again.",
+          "icebreaker-hint icebreaker-hint--error"
+        );
+        setStatus("Route step out of sync.", "error");
+        return;
+      }
       draft = emptyDraft(nextRoute.routeId);
       state.icebreakerDraft = draft;
       saveState(state);
@@ -807,8 +816,17 @@ const bindQuestionsPage = () => {
   };
 
   const render = () => {
+    try {
     const route = assignedRoutes[routeIndex];
-    if (!route || !draft) return;
+    if (!route || !draft) {
+      pill.textContent = "Error";
+      showStageHint(
+        "Could not render routes. Tap “Clear saved route progress” below.",
+        "icebreaker-hint icebreaker-hint--error"
+      );
+      setStatus("Stale or missing route step.", "error");
+      return;
+    }
     draft = normalizeDraft(route, draft);
     syncChrome();
     stage.innerHTML = "";
@@ -923,6 +941,14 @@ const bindQuestionsPage = () => {
       wrap.appendChild(actions);
       stage.appendChild(wrap);
     }
+    } catch (err) {
+      pill.textContent = "Error";
+      showStageHint(
+        err instanceof Error ? err.message : "Something went wrong rendering this route.",
+        "icebreaker-hint icebreaker-hint--error"
+      );
+      setStatus("Could not render icebreaker route.", "error");
+    }
   };
 
   backBtn.addEventListener("click", () => {
@@ -972,12 +998,38 @@ const bindQuestionsPage = () => {
         return;
       }
       state.routeCatalogVersion = catalog.version || "v1";
-      if (!Array.isArray(state.assignedRouteIds) || state.assignedRouteIds.length !== REQUIRED_ASSIGNED_ROUTES) {
-        state.assignedRouteIds = shuffle(routes.map((r) => r.routeId)).slice(0, REQUIRED_ASSIGNED_ROUTES);
-      }
-      assignedRoutes = state.assignedRouteIds
+
+      const catalogRouteIds = new Set(routes.map((r) => r.routeId));
+      state.icebreakerResponses = state.icebreakerResponses.filter(
+        (r) => r && catalogRouteIds.has(r.routeId)
+      );
+
+      const prevAssigned = Array.isArray(state.assignedRouteIds) ? state.assignedRouteIds : [];
+      let resolved = prevAssigned
         .map((id) => routes.find((r) => r.routeId === id))
         .filter(Boolean);
+      const assignedIdsOk =
+        prevAssigned.length === REQUIRED_ASSIGNED_ROUTES &&
+        prevAssigned.every((id) => catalogRouteIds.has(id)) &&
+        resolved.length === REQUIRED_ASSIGNED_ROUTES;
+
+      if (!assignedIdsOk) {
+        state.assignedRouteIds = shuffle(routes.map((r) => r.routeId)).slice(0, REQUIRED_ASSIGNED_ROUTES);
+        state.icebreakerResponses = [];
+        state.icebreakerDraft = null;
+        resolved = state.assignedRouteIds
+          .map((id) => routes.find((r) => r.routeId === id))
+          .filter(Boolean);
+      }
+
+      const assignedIdSet = new Set(state.assignedRouteIds);
+      state.icebreakerResponses = state.icebreakerResponses.filter((r) => assignedIdSet.has(r.routeId));
+      if (state.icebreakerDraft?.routeId && !assignedIdSet.has(state.icebreakerDraft.routeId)) {
+        state.icebreakerDraft = null;
+      }
+      saveState(state);
+
+      assignedRoutes = resolved;
       if (assignedRoutes.length < REQUIRED_ASSIGNED_ROUTES) {
         pill.textContent = "Error";
         showStageHint("Assigned routes could not be resolved from the catalog.", "icebreaker-hint icebreaker-hint--error");
@@ -1017,6 +1069,17 @@ const bindQuestionsPage = () => {
       setStatus(msg, "error");
     }
   };
+
+  const resetProgressBtn = document.getElementById("icebreaker-reset-progress");
+  if (resetProgressBtn) {
+    resetProgressBtn.addEventListener("click", () => {
+      state.icebreakerResponses = [];
+      state.icebreakerDraft = null;
+      state.assignedRouteIds = [];
+      saveState(state);
+      window.location.reload();
+    });
+  }
 
   hydrate();
 };

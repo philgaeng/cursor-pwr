@@ -22,6 +22,12 @@ The web app calls **same-origin** `/api/...`. That works automatically on Vercel
 
 Connect the repo to [Vercel](https://vercel.com) and use **Git integration** (push to trigger builds). `vercel.json` routes `/api/*` to `api/handler.js` and serves `apps/web` for page requests. The Vercel CLI is not required for deploy if you sync via Git.
 
+### API persistence (production)
+
+When **`POSTGRES_URL`** or **`POSTGRES_PRISMA_URL`** is set (for example via the Vercel Supabase integration), the handler uses **Postgres** for organizer accounts/sessions/events and for attendee profiles, waves, match actions, and meetup preferences. Without those variables, it falls back to the previous **in-memory + JSON file** behavior for local development.
+
+Run migrations against your Supabase project from the repo root: `npx supabase db push` (after `npx supabase link`).
+
 ## Docs
 
 - `docs/MVP.md` — scope, Vercel-only runtime, acceptance criteria

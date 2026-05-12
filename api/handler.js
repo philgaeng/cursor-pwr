@@ -2,6 +2,8 @@ const { randomUUID } = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const organizerAuth = require("./organizer-auth-store");
+const db = require("./db");
+const attendeePg = require("./attendee-pg");
 
 const DEMO_MODE_ENABLED = process.env.DEMO_MODE_ENABLED !== "false";
 const EVENT_ID = "demo-event-2026";
@@ -162,10 +164,18 @@ const buildDefaultOrganizerSettings = () => ({
   },
 });
 
-organizerAuth.loadOrganizerStoreFromDisk(buildDefaultOrganizerSettings);
-organizerAuth.getDefaultPublicOrganizerProjection(buildDefaultOrganizerSettings, (projection) => {
-  globalThis.__organizerSettings = projection;
-});
+let apiInitPromise = null;
+async function ensureApiInitialized() {
+  if (!apiInitPromise) {
+    apiInitPromise = (async () => {
+      await organizerAuth.loadOrganizerStoreFromDisk(buildDefaultOrganizerSettings);
+      await organizerAuth.getDefaultPublicOrganizerProjection(buildDefaultOrganizerSettings, (proj) => {
+        globalThis.__organizerSettings = proj;
+      });
+    })();
+  }
+  await apiInitPromise;
+}
 
 const mergeObjects = (base, override) => {
   if (Array.isArray(base) && Array.isArray(override)) {
@@ -607,15 +617,23 @@ const getOrganizerBearerToken = (req, body) => {
   return null;
 };
 
-const requireOrganizerSession = (req, body) => {
+const requireOrganizerSession = async (req, body) => {
   const token = getOrganizerBearerToken(req, body);
-  const organizer = organizerAuth.getOrganizerForSession(token);
+  const organizer = await organizerAuth.getOrganizerForSession(token);
   if (!organizer) return null;
   return { token, organizer, organizerKey: organizer.key };
 };
 
-const persistOrganizerGlobalSettings = (organizerKey) => {
-  organizerAuth.applyFullActiveEventSettings(organizerKey, globalThis.__organizerSettings);
+const persistOrganizerGlobalSettings = async (organizerKey) => {
+  await organizerAuth.applyFullActiveEventSettings(organizerKey, globalThis.__organizerSettings);
+};
+
+const hasCompletedProfile = async (userId) => {
+  if (!isNonEmptyString(userId)) return false;
+  if (db.usePersistence()) {
+    return attendeePg.profileExists(userId, EVENT_ID);
+  }
+  return store.profiles.has(userId);
 };
 
 const getUserId = (req, body) =>
@@ -782,9 +800,18 @@ module.exports = async (req, res) => {
       body = await readJsonBody(req);
     }
     if (req.method === "GET" && path === "/health") {
-      sendJson(res, 200, { ok: true, service: "api", mode: "vercel" });
+      const dbPing = await db.ping();
+      sendJson(res, 200, {
+        ok: true,
+        service: "api",
+        mode: "vercel",
+        persistence: db.usePersistence(),
+        database: dbPing,
+      });
       return;
     }
+
+    await ensureApiInitialized();
 
     if (req.method === "GET" && path === "/tags/catalog") {
       sendJson(res, 200, { ok: true, eventId: EVENT_ID, tags: GLOBAL_TAG_CATALOG });
@@ -821,7 +848,7 @@ module.exports = async (req, res) => {
     }
 
     if (req.method === "POST" && path === "/organizer/signup") {
-      const created = organizerAuth.createOrganizer(body?.name, body?.email, body?.password, buildDefaultOrganizerSettings);
+      const created = await organizerAuth.createOrganizer(body?.name, body?.email, body?.password, buildDefaultOrganizerSettings);
       if (!created.ok) {
         sendJson(res, 400, { ok: false, error: created.error });
         return;
@@ -836,12 +863,12 @@ module.exports = async (req, res) => {
     }
 
     if (req.method === "POST" && path === "/organizer/login") {
-      const logged = organizerAuth.loginOrganizer(body?.email, body?.password);
+      const logged = await organizerAuth.loginOrganizer(body?.email, body?.password);
       if (!logged.ok) {
         sendJson(res, 401, { ok: false, error: logged.error });
         return;
       }
-      organizerAuth.syncGlobalOrganizerSettingsFromEvent(logged.organizer.key, logged.organizer.lastActiveEventKey, (projection) => {
+      await organizerAuth.syncGlobalOrganizerSettingsFromEvent(logged.organizer.key, logged.organizer.lastActiveEventKey, (projection) => {
         globalThis.__organizerSettings = projection;
       });
       sendJson(res, 200, {
@@ -857,18 +884,18 @@ module.exports = async (req, res) => {
 
     if (req.method === "POST" && path === "/organizer/logout") {
       const token = getOrganizerBearerToken(req, body);
-      organizerAuth.revokeOrganizerSession(token);
+      await organizerAuth.revokeOrganizerSession(token);
       sendJson(res, 200, { ok: true });
       return;
     }
 
     if (req.method === "GET" && path === "/organizer/me") {
-      const sess = requireOrganizerSession(req, body);
+      const sess = await requireOrganizerSession(req, body);
       if (!sess) {
         sendJson(res, 401, { ok: false, error: "Organizer session required." });
         return;
       }
-      organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, sess.organizer.lastActiveEventKey, (projection) => {
+      await organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, sess.organizer.lastActiveEventKey, (projection) => {
         globalThis.__organizerSettings = projection;
       });
       sendJson(res, 200, {
@@ -876,14 +903,14 @@ module.exports = async (req, res) => {
         organizerKey: sess.organizerKey,
         details: sess.organizer.details,
         activeEventKey: sess.organizer.lastActiveEventKey,
-        events: organizerAuth.listEvents(sess.organizerKey),
+        events: await organizerAuth.listEvents(sess.organizerKey),
         diskWriteOk: organizerAuth.diskWriteSucceeded(),
       });
       return;
     }
 
     if (req.method === "GET" && path === "/organizer/events") {
-      const sess = requireOrganizerSession(req, body);
+      const sess = await requireOrganizerSession(req, body);
       if (!sess) {
         sendJson(res, 401, { ok: false, error: "Organizer session required." });
         return;
@@ -891,38 +918,38 @@ module.exports = async (req, res) => {
       sendJson(res, 200, {
         ok: true,
         activeEventKey: sess.organizer.lastActiveEventKey,
-        events: organizerAuth.listEvents(sess.organizerKey),
+        events: await organizerAuth.listEvents(sess.organizerKey),
       });
       return;
     }
 
     if (req.method === "POST" && path === "/organizer/events") {
-      const sess = requireOrganizerSession(req, body);
+      const sess = await requireOrganizerSession(req, body);
       if (!sess) {
         sendJson(res, 401, { ok: false, error: "Organizer session required." });
         return;
       }
       const name = isNonEmptyString(body?.name) ? body.name.trim() : "New event";
-      const created = organizerAuth.createEvent(sess.organizerKey, name, buildDefaultOrganizerSettings);
+      const created = await organizerAuth.createEvent(sess.organizerKey, name, buildDefaultOrganizerSettings);
       if (!created.ok) {
         sendJson(res, 400, { ok: false, error: created.error });
         return;
       }
-      organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, created.eventKey, (projection) => {
+      await organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, created.eventKey, (projection) => {
         globalThis.__organizerSettings = projection;
       });
       sendJson(res, 200, {
         ok: true,
         activeEventKey: created.eventKey,
         settings: globalThis.__organizerSettings,
-        events: organizerAuth.listEvents(sess.organizerKey),
+        events: await organizerAuth.listEvents(sess.organizerKey),
         diskWriteOk: organizerAuth.diskWriteSucceeded(),
       });
       return;
     }
 
     if (req.method === "POST" && path === "/organizer/events/select") {
-      const sess = requireOrganizerSession(req, body);
+      const sess = await requireOrganizerSession(req, body);
       if (!sess) {
         sendJson(res, 401, { ok: false, error: "Organizer session required." });
         return;
@@ -932,56 +959,56 @@ module.exports = async (req, res) => {
         sendJson(res, 400, { ok: false, error: "eventKey is required." });
         return;
       }
-      const sel = organizerAuth.setLastActiveEvent(sess.organizerKey, eventKey.trim());
+      const sel = await organizerAuth.setLastActiveEvent(sess.organizerKey, eventKey.trim());
       if (!sel.ok) {
         sendJson(res, 400, { ok: false, error: sel.error });
         return;
       }
-      organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, eventKey.trim(), (projection) => {
+      await organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, eventKey.trim(), (projection) => {
         globalThis.__organizerSettings = projection;
       });
       sendJson(res, 200, {
         ok: true,
         activeEventKey: eventKey.trim(),
         settings: globalThis.__organizerSettings,
-        events: organizerAuth.listEvents(sess.organizerKey),
+        events: await organizerAuth.listEvents(sess.organizerKey),
         diskWriteOk: organizerAuth.diskWriteSucceeded(),
       });
       return;
     }
 
     if (req.method === "POST" && path === "/organizer/events/clone") {
-      const sess = requireOrganizerSession(req, body);
+      const sess = await requireOrganizerSession(req, body);
       if (!sess) {
         sendJson(res, 401, { ok: false, error: "Organizer session required." });
         return;
       }
       const fromEventKey = isNonEmptyString(body?.fromEventKey) ? body.fromEventKey.trim() : sess.organizer.lastActiveEventKey;
-      const cloned = organizerAuth.cloneEvent(sess.organizerKey, fromEventKey, buildDefaultOrganizerSettings);
+      const cloned = await organizerAuth.cloneEvent(sess.organizerKey, fromEventKey, buildDefaultOrganizerSettings);
       if (!cloned.ok) {
         sendJson(res, 400, { ok: false, error: cloned.error });
         return;
       }
-      organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, cloned.eventKey, (projection) => {
+      await organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, cloned.eventKey, (projection) => {
         globalThis.__organizerSettings = projection;
       });
       sendJson(res, 200, {
         ok: true,
         activeEventKey: cloned.eventKey,
         settings: globalThis.__organizerSettings,
-        events: organizerAuth.listEvents(sess.organizerKey),
+        events: await organizerAuth.listEvents(sess.organizerKey),
         diskWriteOk: organizerAuth.diskWriteSucceeded(),
       });
       return;
     }
 
     if (req.method === "GET" && path === "/organizer/settings") {
-      const sess = requireOrganizerSession(req, body);
+      const sess = await requireOrganizerSession(req, body);
       if (!sess) {
         sendJson(res, 401, { ok: false, error: "Organizer session required." });
         return;
       }
-      organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, sess.organizer.lastActiveEventKey, (projection) => {
+      await organizerAuth.syncGlobalOrganizerSettingsFromEvent(sess.organizerKey, sess.organizer.lastActiveEventKey, (projection) => {
         globalThis.__organizerSettings = projection;
       });
       sendJson(res, 200, {
@@ -989,7 +1016,7 @@ module.exports = async (req, res) => {
         eventId: globalThis.__organizerSettings?.eventInfo?.id || EVENT_ID,
         organizerKey: sess.organizerKey,
         activeEventKey: sess.organizer.lastActiveEventKey,
-        events: organizerAuth.listEvents(sess.organizerKey),
+        events: await organizerAuth.listEvents(sess.organizerKey),
         settings: globalThis.__organizerSettings,
         diskWriteOk: organizerAuth.diskWriteSucceeded(),
       });
@@ -997,7 +1024,7 @@ module.exports = async (req, res) => {
     }
 
     if (req.method === "POST" && path === "/organizer/settings") {
-      const sess = requireOrganizerSession(req, body);
+      const sess = await requireOrganizerSession(req, body);
       if (!sess) {
         sendJson(res, 401, { ok: false, error: "Organizer session required." });
         return;
@@ -1027,14 +1054,14 @@ module.exports = async (req, res) => {
         return;
       }
       globalThis.__organizerSettings = nextSettings;
-      persistOrganizerGlobalSettings(sess.organizerKey);
+      await persistOrganizerGlobalSettings(sess.organizerKey);
       globalThis.__routeCatalog = undefined;
       sendJson(res, 200, {
         ok: true,
         eventId: globalThis.__organizerSettings?.eventInfo?.id || EVENT_ID,
         organizerKey: sess.organizerKey,
         activeEventKey: sess.organizer.lastActiveEventKey,
-        events: organizerAuth.listEvents(sess.organizerKey),
+        events: await organizerAuth.listEvents(sess.organizerKey),
         settings: globalThis.__organizerSettings,
         diskWriteOk: organizerAuth.diskWriteSucceeded(),
       });
@@ -1042,7 +1069,7 @@ module.exports = async (req, res) => {
     }
 
     if (req.method === "POST" && path === "/organizer/routes/publish") {
-      const sess = requireOrganizerSession(req, body);
+      const sess = await requireOrganizerSession(req, body);
       if (!sess) {
         sendJson(res, 401, { ok: false, error: "Organizer session required." });
         return;
@@ -1073,13 +1100,13 @@ module.exports = async (req, res) => {
         sendJson(res, 500, { ok: false, error: settingsErr });
         return;
       }
-      persistOrganizerGlobalSettings(sess.organizerKey);
+      await persistOrganizerGlobalSettings(sess.organizerKey);
       sendJson(res, 200, {
         ok: true,
         eventId: globalThis.__organizerSettings?.eventInfo?.id || EVENT_ID,
         organizerKey: sess.organizerKey,
         activeEventKey: sess.organizer.lastActiveEventKey,
-        events: organizerAuth.listEvents(sess.organizerKey),
+        events: await organizerAuth.listEvents(sess.organizerKey),
         settings: globalThis.__organizerSettings,
         diskWriteOk: organizerAuth.diskWriteSucceeded(),
       });
@@ -1087,7 +1114,7 @@ module.exports = async (req, res) => {
     }
 
     if (req.method === "POST" && path === "/organizer/routes/rollback") {
-      const sess = requireOrganizerSession(req, body);
+      const sess = await requireOrganizerSession(req, body);
       if (!sess) {
         sendJson(res, 401, { ok: false, error: "Organizer session required." });
         return;
@@ -1107,13 +1134,13 @@ module.exports = async (req, res) => {
       globalThis.__organizerSettings.icebreakerRoutesHistory = [];
       globalThis.__organizerSettings.icebreakerRoutesDraft = null;
       globalThis.__routeCatalog = undefined;
-      persistOrganizerGlobalSettings(sess.organizerKey);
+      await persistOrganizerGlobalSettings(sess.organizerKey);
       sendJson(res, 200, {
         ok: true,
         eventId: globalThis.__organizerSettings?.eventInfo?.id || EVENT_ID,
         organizerKey: sess.organizerKey,
         activeEventKey: sess.organizer.lastActiveEventKey,
-        events: organizerAuth.listEvents(sess.organizerKey),
+        events: await organizerAuth.listEvents(sess.organizerKey),
         settings: globalThis.__organizerSettings,
         diskWriteOk: organizerAuth.diskWriteSucceeded(),
       });
@@ -1121,7 +1148,7 @@ module.exports = async (req, res) => {
     }
 
     if (req.method === "POST" && path === "/organizer/routes/generate") {
-      const sess = requireOrganizerSession(req, body);
+      const sess = await requireOrganizerSession(req, body);
       if (!sess) {
         sendJson(res, 401, { ok: false, error: "Organizer session required." });
         return;
@@ -1152,7 +1179,7 @@ module.exports = async (req, res) => {
         catalog: generatedCatalog,
         validationWarning: draftErr || null,
       };
-      persistOrganizerGlobalSettings(sess.organizerKey);
+      await persistOrganizerGlobalSettings(sess.organizerKey);
       sendJson(res, 200, {
         ok: true,
         source: OPENAI_API_KEY ? "openai_or_fallback" : "deterministic_fallback",
@@ -1385,18 +1412,25 @@ module.exports = async (req, res) => {
         whatsapp: body.whatsapp || draft.profile?.whatsapp,
       };
       store.profiles.set(userId, profile);
+      if (db.usePersistence()) {
+        await attendeePg.upsertProfile(userId, EVENT_ID, profile);
+      }
       sendJson(res, 200, { ok: true, userId, profile });
       return;
     }
 
     if (req.method === "GET" && path === "/waves/current") {
       const userId = req.headers["x-user-id"] || req.query.userId;
-      if (!isNonEmptyString(userId) || !store.profiles.has(userId)) {
+      if (!isNonEmptyString(userId) || !(await hasCompletedProfile(userId))) {
         sendJson(res, 400, {
           ok: false,
           error: "Known userId with completed onboarding is required.",
         });
         return;
+      }
+      if (db.usePersistence()) {
+        const fromDb = await attendeePg.getWave(EVENT_ID);
+        if (fromDb) store.wavesByEvent.set(EVENT_ID, fromDb);
       }
       const existing = store.wavesByEvent.get(EVENT_ID);
       if (existing) {
@@ -1405,13 +1439,16 @@ module.exports = async (req, res) => {
       }
       const wave = createWave(EVENT_ID);
       store.wavesByEvent.set(EVENT_ID, wave);
+      if (db.usePersistence()) {
+        await attendeePg.upsertWave(EVENT_ID, wave);
+      }
       sendJson(res, 200, wave);
       return;
     }
 
     if (req.method === "POST" && path === "/waves/trigger") {
       const userId = req.headers["x-user-id"] || req.query.userId;
-      if (!isNonEmptyString(userId) || !store.profiles.has(userId)) {
+      if (!isNonEmptyString(userId) || !(await hasCompletedProfile(userId))) {
         sendJson(res, 400, {
           ok: false,
           error: "Known userId with completed onboarding is required.",
@@ -1420,13 +1457,16 @@ module.exports = async (req, res) => {
       }
       const wave = createWave(EVENT_ID);
       store.wavesByEvent.set(EVENT_ID, wave);
+      if (db.usePersistence()) {
+        await attendeePg.upsertWave(EVENT_ID, wave);
+      }
       sendJson(res, 200, wave);
       return;
     }
 
     if (req.method === "POST" && path === "/matches/action") {
       const userId = getUserId(req, body);
-      if (!isNonEmptyString(userId) || !store.profiles.has(userId)) {
+      if (!isNonEmptyString(userId) || !(await hasCompletedProfile(userId))) {
         sendJson(res, 400, {
           ok: false,
           error: "Known userId with completed onboarding is required.",
@@ -1445,12 +1485,23 @@ module.exports = async (req, res) => {
         return;
       }
       const key = `${userId}::${body.targetUserId}`;
+      const actedAt = new Date().toISOString();
       store.actions.set(key, {
         waveId: body.waveId,
         targetUserId: body.targetUserId,
         action: body.action,
-        actedAt: new Date().toISOString(),
+        actedAt,
       });
+      if (db.usePersistence()) {
+        await attendeePg.upsertMatchAction(
+          EVENT_ID,
+          userId,
+          body.targetUserId,
+          body.waveId,
+          body.action,
+          actedAt
+        );
+      }
       const isMutual = body.action === "like" && body.targetUserId === "u2";
       const mutualMatch = {
         userId,
@@ -1473,7 +1524,7 @@ module.exports = async (req, res) => {
 
     if (req.method === "POST" && path === "/meetup/preferences") {
       const userId = getUserId(req, body);
-      if (!isNonEmptyString(userId) || !store.profiles.has(userId)) {
+      if (!isNonEmptyString(userId) || !(await hasCompletedProfile(userId))) {
         sendJson(res, 400, {
           ok: false,
           error: "Known userId with completed onboarding is required.",
@@ -1488,10 +1539,14 @@ module.exports = async (req, res) => {
         });
         return;
       }
-      store.meetupPreferences.set(userId, {
+      const prefs = {
         wearableMarker,
         updatedAt: new Date().toISOString(),
-      });
+      };
+      store.meetupPreferences.set(userId, prefs);
+      if (db.usePersistence()) {
+        await attendeePg.upsertMeetupPreferences(userId, EVENT_ID, prefs);
+      }
       sendJson(res, 200, {
         ok: true,
         userId,
@@ -1503,7 +1558,7 @@ module.exports = async (req, res) => {
     if (req.method === "GET" && path === "/meetup/plan") {
       const userId = req.headers["x-user-id"] || req.query.userId;
       const targetUserId = req.query.targetUserId;
-      if (!isNonEmptyString(userId) || !store.profiles.has(userId)) {
+      if (!isNonEmptyString(userId) || !(await hasCompletedProfile(userId))) {
         sendJson(res, 400, {
           ok: false,
           error: "Known userId with completed onboarding is required.",
@@ -1518,7 +1573,11 @@ module.exports = async (req, res) => {
         return;
       }
       const plan = buildPairMeetupPlan(userId, targetUserId);
-      const selfPreference = store.meetupPreferences.get(userId) || null;
+      let selfPreference = store.meetupPreferences.get(userId) || null;
+      if (db.usePersistence()) {
+        const fromDb = await attendeePg.getMeetupPreferences(userId, EVENT_ID);
+        if (fromDb) selfPreference = fromDb;
+      }
       sendJson(res, 200, {
         ok: true,
         targetUserId,

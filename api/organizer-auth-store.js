@@ -1,5 +1,6 @@
 /**
- * Spec 10: organizer accounts, event-scoped settings, JSON file persistence, bearer sessions.
+ * Spec 10: organizer accounts, event-scoped settings, bearer sessions.
+ * Disk + JSON file when POSTGRES_URL unset; Postgres when POSTGRES_URL / POSTGRES_PRISMA_URL set.
  * @module
  */
 
@@ -7,10 +8,15 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 
+const db = require("./db");
+const organizerPg = require("./organizer-pg");
+
 const DEMO_MODE_ENABLED = process.env.DEMO_MODE_ENABLED !== "false";
 const DEMO_ORGANIZER_PASSWORD = process.env.DEMO_ORGANIZER_PASSWORD || "changeme";
 
 const STORE_VERSION = 1;
+
+const usePg = () => db.usePersistence();
 
 const defaultStorePaths = () => [
   path.join(process.cwd(), "data", "organizer-store.json"),
@@ -56,7 +62,6 @@ if (!globalThis.__organizerSessions) {
 }
 
 const sessions = globalThis.__organizerSessions;
-
 const sessionTtlMs = 7 * 24 * 60 * 60 * 1000;
 
 const pruneSessions = () => {
@@ -68,14 +73,14 @@ const pruneSessions = () => {
   }
 };
 
-const issueSession = (organizerKey) => {
+const issueSessionDisk = (organizerKey) => {
   pruneSessions();
   const token = crypto.randomBytes(32).toString("hex");
   sessions.set(token, { organizerKey, expiresAt: Date.now() + sessionTtlMs });
   return token;
 };
 
-const resolveSession = (token) => {
+const resolveSessionDisk = (token) => {
   if (!token) return null;
   pruneSessions();
   const meta = sessions.get(token);
@@ -86,7 +91,7 @@ const resolveSession = (token) => {
   return meta.organizerKey;
 };
 
-const revokeSession = (token) => {
+const revokeSessionDisk = (token) => {
   if (token) sessions.delete(token);
 };
 
@@ -136,7 +141,7 @@ const setDiskStore = (next) => {
 const findOrganizerIndex = (emailNormalized) =>
   getDiskStore().organizers.findIndex((o) => o.emailNormalized === emailNormalized);
 
-const findOrganizerByKey = (organizerKey) =>
+const findOrganizerByKeyDisk = (organizerKey) =>
   getDiskStore().organizers.find((o) => o.key === organizerKey) || null;
 
 const getEvent = (organizer, eventKey) =>
@@ -154,7 +159,10 @@ const ensureEventSettingsShape = (settings) => {
       apiKeys: { openai: "", anthropic: "", gemini: "", deepseek: "" },
     };
   } else {
-    const k = settings.organizer.llm.apiKeys && typeof settings.organizer.llm.apiKeys === "object" ? settings.organizer.llm.apiKeys : {};
+    const k =
+      settings.organizer.llm.apiKeys && typeof settings.organizer.llm.apiKeys === "object"
+        ? settings.organizer.llm.apiKeys
+        : {};
     settings.organizer.llm.apiKeys = {
       openai: typeof k.openai === "string" ? k.openai : "",
       anthropic: typeof k.anthropic === "string" ? k.anthropic : "",
@@ -180,29 +188,92 @@ function isEmailShape(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
-function syncGlobalOrganizerSettingsFromEvent(organizerKey, eventKey, assignGlobal) {
-  const org = findOrganizerByKey(organizerKey);
+/** Normalize loaded organizer events from Postgres or disk */
+const normalizeOrganizerShape = (org) => {
   if (!org) return null;
-  const ev = getEvent(org, eventKey || org.lastActiveEventKey);
-  if (!ev || !ev.settings) return null;
-  ensureEventSettingsShape(ev.settings);
-  syncIcebreakerRoutesMirror(ev);
-  if (typeof assignGlobal === "function") {
-    assignGlobal(cloneDeep(ev.settings));
+  if (!Array.isArray(org.events)) org.events = [];
+  for (const ev of org.events) {
+    if (ev.settings) ensureEventSettingsShape(ev.settings);
+    syncIcebreakerRoutesMirror(ev);
   }
-  return ev.settings;
+  return org;
+};
+
+async function findOrganizerByKey(organizerKey) {
+  if (usePg()) {
+    const o = await organizerPg.findByKey(organizerKey);
+    return normalizeOrganizerShape(o);
+  }
+  return findOrganizerByKeyDisk(organizerKey);
+}
+
+async function findOrganizerByEmail(emailNormalized) {
+  if (usePg()) {
+    const o = await organizerPg.findByEmail(emailNormalized);
+    return normalizeOrganizerShape(o);
+  }
+  const idx = findOrganizerIndex(emailNormalized);
+  if (idx === -1) return null;
+  return getDiskStore().organizers[idx];
+}
+
+async function issueSessionImpl(organizerKey) {
+  if (usePg()) {
+    try {
+      diskWriteOk = true;
+      return await organizerPg.issueSession(organizerKey);
+    } catch (_e) {
+      diskWriteOk = false;
+      throw _e;
+    }
+  }
+  return issueSessionDisk(organizerKey);
+}
+
+async function resolveSessionImpl(token) {
+  if (usePg()) return organizerPg.resolveSession(token);
+  return resolveSessionDisk(token);
+}
+
+async function revokeSessionImpl(token) {
+  if (usePg()) return organizerPg.revokeSession(token);
+  revokeSessionDisk(token);
 }
 
 module.exports = {
   normalizeEmail,
   scryptHashPassword,
   verifyPassword,
-  issueSession,
-  resolveSession,
-  revokeSession,
+
+  async issueSession(organizerKey) {
+    return issueSessionImpl(organizerKey);
+  },
+
+  async resolveSession(token) {
+    return resolveSessionImpl(token);
+  },
+
+  async revokeSession(token) {
+    return revokeSessionImpl(token);
+  },
+
   getStorePath,
   diskWriteSucceeded: () => diskWriteOk,
-  loadOrganizerStoreFromDisk(buildDefaultOrganizerSettings) {
+
+  async loadOrganizerStoreFromDisk(buildDefaultOrganizerSettings) {
+    if (usePg()) {
+      diskWriteOk = true;
+      if (DEMO_MODE_ENABLED) {
+        await organizerPg.seedDemoOrganizerIfEmpty(
+          buildDefaultOrganizerSettings,
+          scryptHashPassword,
+          DEMO_ORGANIZER_PASSWORD,
+          ensureEventSettingsShape
+        );
+      }
+      return { usedPath: "(postgres)", store: null };
+    }
+
     const { path: usedPath, data } = readDiskStore();
     let store = data;
     if (!store || !Array.isArray(store.organizers)) {
@@ -266,9 +337,32 @@ module.exports = {
     return { usedPath: usedPath || getStorePath(), store: getDiskStore() };
   },
 
-  syncGlobalOrganizerSettingsFromEvent,
+  async syncGlobalOrganizerSettingsFromEvent(organizerKey, eventKey, assignGlobal) {
+    const org = await findOrganizerByKey(organizerKey);
+    if (!org) return null;
+    const ev = getEvent(org, eventKey || org.lastActiveEventKey);
+    if (!ev || !ev.settings) return null;
+    ensureEventSettingsShape(ev.settings);
+    syncIcebreakerRoutesMirror(ev);
+    if (typeof assignGlobal === "function") {
+      assignGlobal(cloneDeep(ev.settings));
+    }
+    return ev.settings;
+  },
 
-  getDefaultPublicOrganizerProjection(buildDefaultOrganizerSettings, assignGlobal) {
+  async getDefaultPublicOrganizerProjection(buildDefaultOrganizerSettings, assignGlobal) {
+    if (usePg()) {
+      const org = await organizerPg.firstOrganizerForProjection();
+      if (!org) {
+        const fallback = buildDefaultOrganizerSettings();
+        if (typeof assignGlobal === "function") assignGlobal(fallback);
+        return { organizerKey: null, eventKey: null, settings: fallback };
+      }
+      const eventKey = org.lastActiveEventKey || org.events[0]?.event_key;
+      const settings = await module.exports.syncGlobalOrganizerSettingsFromEvent(org.key, eventKey, assignGlobal);
+      return { organizerKey: org.key, eventKey, settings };
+    }
+
     const store = getDiskStore();
     const org = store.organizers[0];
     if (!org) {
@@ -277,11 +371,11 @@ module.exports = {
       return { organizerKey: null, eventKey: null, settings: fallback };
     }
     const eventKey = org.lastActiveEventKey || org.events[0]?.event_key;
-    const settings = syncGlobalOrganizerSettingsFromEvent(org.key, eventKey, assignGlobal);
+    const settings = await module.exports.syncGlobalOrganizerSettingsFromEvent(org.key, eventKey, assignGlobal);
     return { organizerKey: org.key, eventKey, settings };
   },
 
-  createOrganizer(name, email, password, buildDefaultOrganizerSettings) {
+  async createOrganizer(name, email, password, buildDefaultOrganizerSettings) {
     const emailNorm = normalizeEmail(email);
     if (!emailNorm || !isEmailShape(emailNorm)) {
       return { ok: false, error: "Valid email is required." };
@@ -292,9 +386,7 @@ module.exports = {
     if (!String(password || "") || String(password).length < 8) {
       return { ok: false, error: "Password must be at least 8 characters." };
     }
-    if (findOrganizerIndex(emailNorm) !== -1) {
-      return { ok: false, error: "An organizer with this email already exists." };
-    }
+
     const orgKey = crypto.randomUUID();
     const evtKey = crypto.randomUUID();
     const seedSettings = buildDefaultOrganizerSettings();
@@ -317,40 +409,67 @@ module.exports = {
       ],
     };
     syncIcebreakerRoutesMirror(organizer.events[0]);
+
+    if (usePg()) {
+      try {
+        await organizerPg.insertOrganizerAndEvent(organizer);
+        diskWriteOk = true;
+      } catch (err) {
+        diskWriteOk = false;
+        if (err && err.code === "23505") {
+          return { ok: false, error: "An organizer with this email already exists." };
+        }
+        throw err;
+      }
+      return { ok: true, organizer };
+    }
+
+    if (findOrganizerIndex(emailNorm) !== -1) {
+      return { ok: false, error: "An organizer with this email already exists." };
+    }
     const store = getDiskStore();
     store.organizers.push(organizer);
     setDiskStore(store);
     return { ok: true, organizer };
   },
 
-  loginOrganizer(email, password) {
+  async loginOrganizer(email, password) {
     const emailNorm = normalizeEmail(email);
-    const idx = findOrganizerIndex(emailNorm);
-    if (idx === -1) return { ok: false, error: "Invalid email or password." };
-    const organizer = getDiskStore().organizers[idx];
+    const organizer = await findOrganizerByEmail(emailNorm);
+    if (!organizer) return { ok: false, error: "Invalid email or password." };
     if (!verifyPassword(password, organizer.passwordHash)) {
       return { ok: false, error: "Invalid email or password." };
     }
-    const token = issueSession(organizer.key);
+    const token = await issueSessionImpl(organizer.key);
     return { ok: true, token, organizer };
   },
 
-  getOrganizerForSession(token) {
-    const organizerKey = resolveSession(token);
+  async getOrganizerForSession(token) {
+    const organizerKey = await resolveSessionImpl(token);
     if (!organizerKey) return null;
     return findOrganizerByKey(organizerKey);
   },
 
-  setLastActiveEvent(organizerKey, eventKey) {
-    const org = findOrganizerByKey(organizerKey);
+  async setLastActiveEvent(organizerKey, eventKey) {
+    const org = await findOrganizerByKey(organizerKey);
     if (!org || !getEvent(org, eventKey)) return { ok: false, error: "Event not found." };
     org.lastActiveEventKey = eventKey;
-    setDiskStore(getDiskStore());
+    if (usePg()) {
+      try {
+        await organizerPg.updateOrganizerLastActive(organizerKey, eventKey);
+        diskWriteOk = true;
+      } catch (_e) {
+        diskWriteOk = false;
+        throw _e;
+      }
+    } else {
+      setDiskStore(getDiskStore());
+    }
     return { ok: true };
   },
 
-  updateOrganizerActiveEventSettings(organizerKey, incomingSettings, mergeObjects, buildDefaultOrganizerSettings) {
-    const org = findOrganizerByKey(organizerKey);
+  async updateOrganizerActiveEventSettings(organizerKey, incomingSettings, mergeObjects, buildDefaultOrganizerSettings) {
+    const org = await findOrganizerByKey(organizerKey);
     if (!org) return { ok: false, error: "Organizer not found." };
     const eventKey = org.lastActiveEventKey;
     const ev = getEvent(org, eventKey);
@@ -359,24 +478,44 @@ module.exports = {
     ev.settings = mergeObjects(base, incomingSettings);
     ensureEventSettingsShape(ev.settings);
     syncIcebreakerRoutesMirror(ev);
-    setDiskStore(getDiskStore());
+    if (usePg()) {
+      try {
+        await organizerPg.updateEventRow(organizerKey, eventKey, ev.settings, ev.icebreaker_routes);
+        diskWriteOk = true;
+      } catch (_e) {
+        diskWriteOk = false;
+        throw _e;
+      }
+    } else {
+      setDiskStore(getDiskStore());
+    }
     return { ok: true, settings: ev.settings, eventKey };
   },
 
-  applyFullActiveEventSettings(organizerKey, nextSettings) {
-    const org = findOrganizerByKey(organizerKey);
+  async applyFullActiveEventSettings(organizerKey, nextSettings) {
+    const org = await findOrganizerByKey(organizerKey);
     if (!org) return { ok: false, error: "Organizer not found." };
     const ev = getEvent(org, org.lastActiveEventKey);
     if (!ev) return { ok: false, error: "Active event missing." };
     ev.settings = cloneDeep(nextSettings);
     ensureEventSettingsShape(ev.settings);
     syncIcebreakerRoutesMirror(ev);
-    setDiskStore(getDiskStore());
+    if (usePg()) {
+      try {
+        await organizerPg.updateEventRow(organizerKey, ev.event_key, ev.settings, ev.icebreaker_routes);
+        diskWriteOk = true;
+      } catch (_e) {
+        diskWriteOk = false;
+        throw _e;
+      }
+    } else {
+      setDiskStore(getDiskStore());
+    }
     return { ok: true, settings: ev.settings };
   },
 
-  createEvent(organizerKey, name, buildDefaultOrganizerSettings) {
-    const org = findOrganizerByKey(organizerKey);
+  async createEvent(organizerKey, name, buildDefaultOrganizerSettings) {
+    const org = await findOrganizerByKey(organizerKey);
     if (!org) return { ok: false, error: "Organizer not found." };
     const evtKey = crypto.randomUUID();
     const seed = buildDefaultOrganizerSettings();
@@ -391,12 +530,23 @@ module.exports = {
     syncIcebreakerRoutesMirror(eventObj);
     org.events.push(eventObj);
     org.lastActiveEventKey = evtKey;
-    setDiskStore(getDiskStore());
+    if (usePg()) {
+      try {
+        await organizerPg.insertEventRow(organizerKey, eventObj);
+        await organizerPg.updateOrganizerLastActive(organizerKey, evtKey);
+        diskWriteOk = true;
+      } catch (_e) {
+        diskWriteOk = false;
+        throw _e;
+      }
+    } else {
+      setDiskStore(getDiskStore());
+    }
     return { ok: true, eventKey: evtKey };
   },
 
-  cloneEvent(organizerKey, fromEventKey, buildDefaultOrganizerSettings) {
-    const org = findOrganizerByKey(organizerKey);
+  async cloneEvent(organizerKey, fromEventKey, buildDefaultOrganizerSettings) {
+    const org = await findOrganizerByKey(organizerKey);
     if (!org) return { ok: false, error: "Organizer not found." };
     const src = getEvent(org, fromEventKey || org.lastActiveEventKey);
     if (!src || !src.settings) return { ok: false, error: "Source event not found." };
@@ -415,12 +565,24 @@ module.exports = {
     syncIcebreakerRoutesMirror(eventObj);
     org.events.push(eventObj);
     org.lastActiveEventKey = evtKey;
-    setDiskStore(getDiskStore());
+    if (usePg()) {
+      try {
+        await organizerPg.insertEventRow(organizerKey, eventObj);
+        await organizerPg.updateOrganizerLastActive(organizerKey, evtKey);
+        diskWriteOk = true;
+      } catch (_e) {
+        diskWriteOk = false;
+        throw _e;
+      }
+    } else {
+      setDiskStore(getDiskStore());
+    }
     return { ok: true, eventKey: evtKey };
   },
 
-  listEvents(organizerKey) {
-    const org = findOrganizerByKey(organizerKey);
+  async listEvents(organizerKey) {
+    if (usePg()) return organizerPg.listEvents(organizerKey);
+    const org = findOrganizerByKeyDisk(organizerKey);
     if (!org) return [];
     return (org.events || []).map((e) => ({
       event_key: e.event_key,
@@ -429,7 +591,7 @@ module.exports = {
     }));
   },
 
-  revokeOrganizerSession(token) {
-    revokeSession(token);
+  async revokeOrganizerSession(token) {
+    await revokeSessionImpl(token);
   },
 };
