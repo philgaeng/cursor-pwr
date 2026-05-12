@@ -957,12 +957,12 @@ const bindQuestionsPage = () => {
 
   const hydrate = async () => {
     try {
-      /** Static JSON ships with the web app (Vercel rewrite → apps/web); avoids serverless FS issues. */
+      /** Prefer API catalog on Vercel (`api/icebreaker-routes.v1.json` is bundled via `vercel.json` includeFiles). Static `/icebreaker-routes.v1.json` is the fallback (served from `apps/web`). */
       let catalog;
       try {
-        catalog = await apiFetch("/icebreaker-routes.v1.json", { method: "GET" });
-      } catch (_staticErr) {
         catalog = await apiFetch("/api/routes/catalog", { method: "GET" });
+      } catch (_apiErr) {
+        catalog = await apiFetch("/icebreaker-routes.v1.json", { method: "GET" });
       }
       const routes = Array.isArray(catalog.routes) ? catalog.routes : [];
       if (routes.length === 0) {
@@ -1011,7 +1011,7 @@ const bindQuestionsPage = () => {
       const msg = error instanceof Error ? error.message : "Unable to load route catalog.";
       pill.textContent = "Couldn’t load";
       showStageHint(
-        `${msg} In DevTools → Network, confirm GET /api/routes/catalog returns 200 on this host.`,
+        `${msg} In DevTools → Network, confirm GET /api/routes/catalog or GET /icebreaker-routes.v1.json returns 200 on this host.`,
         "icebreaker-hint icebreaker-hint--error"
       );
       setStatus(msg, "error");
